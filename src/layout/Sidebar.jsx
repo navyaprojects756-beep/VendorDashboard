@@ -9,12 +9,14 @@ import GridViewIcon      from "@mui/icons-material/GridView"
 import SettingsIcon      from "@mui/icons-material/Settings"
 import LocalDrinkIcon    from "@mui/icons-material/LocalDrink"
 import ChevronRightIcon  from "@mui/icons-material/ChevronRight"
+import PeopleIcon        from "@mui/icons-material/People"
 
 const MENU = [
-  { key: "orders",     label: "Orders",     icon: <DashboardIcon fontSize="small" />,  badge: null },
-  { key: "apartments", label: "Apartments", icon: <ApartmentIcon fontSize="small" />,  badge: null },
-  { key: "blocks",     label: "Blocks",     icon: <GridViewIcon fontSize="small" />,   badge: null },
-  { key: "settings",   label: "Settings",   icon: <SettingsIcon fontSize="small" />,   badge: null },
+  { key: "orders",     label: "Orders",     icon: <DashboardIcon fontSize="small" /> },
+  { key: "customers",  label: "Customers",  icon: <PeopleIcon fontSize="small" />    },
+  { key: "apartments", label: "Apartments", icon: <ApartmentIcon fontSize="small" /> },
+  { key: "blocks",     label: "Blocks",     icon: <GridViewIcon fontSize="small" />  },
+  { key: "settings",   label: "Settings",   icon: <SettingsIcon fontSize="small" />  },
 ]
 
 export default function Sidebar({ open, setOpen, page, setPage, dark }) {

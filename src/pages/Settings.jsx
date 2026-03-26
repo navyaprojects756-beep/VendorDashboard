@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import API, { getToken } from "../services/api"
 
 import {
@@ -11,8 +11,6 @@ import SettingsIcon       from "@mui/icons-material/Settings"
 import SaveIcon           from "@mui/icons-material/Save"
 import CheckCircleIcon    from "@mui/icons-material/CheckCircle"
 import ApartmentIcon      from "@mui/icons-material/Apartment"
-import GridViewIcon       from "@mui/icons-material/GridView"
-import NotificationsIcon  from "@mui/icons-material/Notifications"
 import LocalDrinkIcon     from "@mui/icons-material/LocalDrink"
 import AccessTimeIcon     from "@mui/icons-material/AccessTime"
 import InfoOutlinedIcon   from "@mui/icons-material/InfoOutlined"
@@ -24,9 +22,7 @@ import LocationOnIcon     from "@mui/icons-material/LocationOn"
 import ImageIcon          from "@mui/icons-material/Image"
 import LockClockIcon      from "@mui/icons-material/LockClock"
 import StorefrontIcon     from "@mui/icons-material/Storefront"
-import NumbersIcon        from "@mui/icons-material/Numbers"
 import AutorenewIcon      from "@mui/icons-material/Autorenew"
-import WarningAmberIcon   from "@mui/icons-material/WarningAmber"
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
@@ -93,6 +89,12 @@ export default function Settings({ dark }) {
   const [pDirty, setPDirty] = useState(false)
   const [pSaved, setPSaved] = useState(false)
 
+  // logo upload
+  const [logoFile, setLogoFile]       = useState(null)
+  const [logoPreview, setLogoPreview] = useState(null)
+  const [logoError, setLogoError]     = useState("")
+  const fileInputRef                  = useRef(null)
+
   const border        = dark ? "#1e293b" : "#e5e7eb"
   const bg            = dark ? "#0f172a" : "#ffffff"
   const bgCard        = dark ? "#111827" : "#f9fafb"
@@ -106,6 +108,26 @@ export default function Settings({ dark }) {
 
   const toggleS = (key) => { setS((prev) => ({ ...prev, [key]: !prev[key] })); setSDirty(true); setSSaved(false) }
   const updateP = (key, val) => { setP((prev) => ({ ...prev, [key]: val })); setPDirty(true); setPSaved(false) }
+
+  const handleLogoSelect = (e) => {
+    const file = e.target.files[0]
+    e.target.value = ""
+    if (!file) return
+    if (!file.type.startsWith("image/")) {
+      setLogoError("Only image files are allowed (JPG, PNG, GIF, WebP).")
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setLogoError(`File too large: ${(file.size / 1024 / 1024).toFixed(1)} MB. Max allowed is 5 MB.`)
+      return
+    }
+    setLogoError("")
+    setLogoFile(file)
+    if (logoPreview) URL.revokeObjectURL(logoPreview)
+    setLogoPreview(URL.createObjectURL(file))
+    setPDirty(true)
+    setPSaved(false)
+  }
 
   const toggleDay = (idx) => {
     const days = Array.isArray(p.active_days) ? [...p.active_days] : [0,1,2,3,4,5,6]
@@ -123,9 +145,27 @@ export default function Settings({ dark }) {
 
   const saveProfile = async () => {
     setPSave(true)
-    await API.put(`/profile?token=${getToken()}`, p)
-    setPSave(false); setPSaved(true); setPDirty(false)
-    setTimeout(() => setPSaved(false), 3000)
+    try {
+      let profileData = { ...p }
+
+      if (logoFile) {
+        const fd = new FormData()
+        fd.append("logo", logoFile)
+        const uploadRes = await API.post(`/upload-logo?token=${getToken()}`, fd, {
+          headers: { "Content-Type": "multipart/form-data" },
+        })
+        profileData.logo_url = uploadRes.data.logo_url
+        setP((prev) => ({ ...prev, logo_url: uploadRes.data.logo_url }))
+        setLogoFile(null)
+        if (logoPreview) { URL.revokeObjectURL(logoPreview); setLogoPreview(null) }
+      }
+
+      await API.put(`/profile?token=${getToken()}`, profileData)
+      setPSaved(true); setPDirty(false)
+      setTimeout(() => setPSaved(false), 3000)
+    } finally {
+      setPSave(false)
+    }
   }
 
   /* ── save bar ── */
@@ -171,14 +211,39 @@ export default function Settings({ dark }) {
           <Section title="Business Info" icon={<BusinessIcon fontSize="small" />} color="#2563eb" dark={dark}>
             <Box sx={{ p: 2.5, display: "flex", flexDirection: "column", gap: 2 }}>
               <Box display="flex" alignItems="center" gap={2}>
-                <Avatar src={p.logo_url || ""} sx={{ width: 56, height: 56, borderRadius: "12px", background: "#eff6ff", border: `2px solid ${border}` }}>
+                <Avatar src={logoPreview || p.logo_url || ""} sx={{ width: 56, height: 56, borderRadius: "12px", background: "#eff6ff", border: `2px solid ${border}`, flexShrink: 0 }}>
                   <LocalDrinkIcon sx={{ color: "#2563eb" }} />
                 </Avatar>
-                <TextField size="small" label="Logo URL" fullWidth value={p.logo_url || ""}
-                  onChange={(e) => updateP("logo_url", e.target.value)}
-                  placeholder="https://…/logo.png"
-                  InputProps={{ startAdornment: <InputAdornment position="start"><ImageIcon fontSize="small" sx={{ color: textSecondary }} /></InputAdornment> }}
-                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }} />
+                <Box flex={1}>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/svg+xml"
+                    style={{ display: "none" }}
+                    onChange={handleLogoSelect}
+                  />
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    startIcon={<ImageIcon fontSize="small" />}
+                    onClick={() => fileInputRef.current?.click()}
+                    sx={{
+                      textTransform: "none", fontWeight: 600, fontSize: 13,
+                      borderRadius: 2, borderColor: border, color: textSecondary,
+                      justifyContent: "flex-start",
+                      "&:hover": { borderColor: "#2563eb", color: "#2563eb", background: "transparent" },
+                    }}
+                  >
+                    {logoFile ? logoFile.name : (p.logo_url ? "Change Logo" : "Upload Logo")}
+                  </Button>
+                  {logoError && (
+                    <Typography fontSize={11} color="#dc2626" mt={0.5}>{logoError}</Typography>
+                  )}
+                  <Typography fontSize={11} color={textSecondary} mt={0.4}>
+                    Images only (JPG, PNG, GIF, WebP) · Max 5 MB
+                  </Typography>
+                </Box>
               </Box>
               <Box display="flex" gap={1.5} flexWrap="wrap">
                 <TextField size="small" label="Business Name" value={p.business_name || ""}
@@ -307,11 +372,8 @@ export default function Settings({ dark }) {
           {/* Address Types */}
           <Section title="Address Types (WhatsApp Bot)" icon={<HomeIcon fontSize="small" />} color="#2563eb" dark={dark}>
             {[
-              { key: "allow_apartments", icon: <ApartmentIcon sx={{ fontSize: 17 }} />, label: "Apartment Delivery", desc: "Customers can select an apartment from your list. Bot will show apartment options.", color: "#2563eb" },
-              { key: "allow_blocks",     icon: <GridViewIcon sx={{ fontSize: 17 }} />,   label: "Block Selection",    desc: "Enable block-level selection within apartments. Apartment Delivery must be on.", color: "#7c3aed" },
-              { key: "require_flat_number", icon: <NumbersIcon sx={{ fontSize: 17 }} />, label: "Require Flat Number", desc: "Ask customers to enter their flat/door number during order registration.", color: "#2563eb" },
-              { key: "allow_houses",     icon: <HomeIcon sx={{ fontSize: 17 }} />,       label: "House / Villa Delivery", desc: "Allow independent house customers to register with a manual address.", color: "#16a34a" },
-              { key: "allow_manual_address", icon: <EditNoteIcon sx={{ fontSize: 17 }} />, label: "Manual Address Entry", desc: "Customers can type their full address manually if no apartment is found.", color: "#16a34a" },
+              { key: "allow_apartments", icon: <ApartmentIcon sx={{ fontSize: 17 }} />, label: "Apartment Delivery",    desc: "Customers can select an apartment from your list. Bot will show apartment options.", color: "#2563eb" },
+              { key: "allow_houses",     icon: <HomeIcon sx={{ fontSize: 17 }} />,       label: "House / Villa Delivery", desc: "Allow independent house customers to register with a manual address.",              color: "#16a34a" },
             ].map((row, i, arr) => (
               <Box key={row.key}>
                 <SettingRow icon={row.icon} label={row.label} desc={row.desc}
@@ -321,67 +383,44 @@ export default function Settings({ dark }) {
             ))}
           </Section>
 
-          {/* Max Quantity */}
+          {/* Price per unit */}
           <Paper elevation={0} sx={{ borderRadius: 3, border: `1px solid ${border}`, background: bg, mb: 2, overflow: "hidden" }}>
             <Box sx={{ px: 2.5, py: 1.5, background: bgCard, borderBottom: `1px solid ${border}`, display: "flex", alignItems: "center", gap: 1 }}>
-              <NumbersIcon fontSize="small" sx={{ color: "#f97316" }} />
-              <Typography fontWeight={700} fontSize={13} color={textPrimary}>Order Limits</Typography>
+              <StorefrontIcon fontSize="small" sx={{ color: "#16a34a" }} />
+              <Typography fontWeight={700} fontSize={13} color={textPrimary}>Pricing</Typography>
             </Box>
             <Box sx={{ px: 2.5, py: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
               <Box flex={1}>
-                <Typography fontWeight={600} fontSize={13.5} color={textPrimary}>Max Quantity per Order</Typography>
-                <Typography fontSize={12} color={textSecondary} mt={0.2}>Maximum milk packets a customer can order per day via WhatsApp.</Typography>
+                <Typography fontWeight={600} fontSize={13.5} color={textPrimary}>Price per Packet (₹)</Typography>
+                <Typography fontSize={12} color={textSecondary} mt={0.2}>
+                  Used to calculate invoice totals for each customer.
+                </Typography>
               </Box>
-              <TextField size="small" type="number" value={s.max_quantity_per_order || 10}
-                onChange={(e) => { setS((prev) => ({ ...prev, max_quantity_per_order: parseInt(e.target.value) || 1 })); setSDirty(true) }}
-                inputProps={{ min: 1, max: 50 }}
-                sx={{ width: 90, "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 15, fontWeight: 700 } }} />
+              <TextField size="small" type="number"
+                value={s.price_per_unit ?? ""}
+                onChange={(e) => { setS((prev) => ({ ...prev, price_per_unit: e.target.value })); setSDirty(true); setSSaved(false) }}
+                slotProps={{ input: { min: 0, step: 0.5, startAdornment: <InputAdornment position="start"><Typography fontSize={14} fontWeight={700}>₹</Typography></InputAdornment> } }}
+                sx={{ width: 110, "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 15, fontWeight: 700 } }} />
             </Box>
           </Paper>
 
-          {/* Order Window & Automation */}
-          <Section title="Order Window & Automation" icon={<LockClockIcon fontSize="small" />} color="#f97316" dark={dark}>
-            {[
-              { key: "order_window_enabled", icon: <LockClockIcon sx={{ fontSize: 17 }} />,  label: "Enforce Order Window", desc: "Only accept WhatsApp orders within the time window set in your Profile tab.", color: "#f97316" },
-              { key: "auto_generate_orders", icon: <AutorenewIcon sx={{ fontSize: 17 }} />,  label: "Auto-generate Daily Orders", desc: "Automatically create orders each morning based on active subscriptions.", color: "#2563eb" },
-            ].map((row, i, arr) => (
-              <Box key={row.key}>
-                <SettingRow icon={row.icon} label={row.label} desc={row.desc}
-                  checked={!!s[row.key]} onChange={() => toggleS(row.key)} color={row.color} dark={dark} />
-                {i < arr.length - 1 && <Divider sx={{ borderColor: border }} />}
-              </Box>
-            ))}
-          </Section>
-
-          {/* Notifications */}
-          <Section title="Notifications" icon={<NotificationsIcon fontSize="small" />} color="#7c3aed" dark={dark}>
-            {[
-              { key: "notify_on_delivery", icon: <CheckCircleIcon sx={{ fontSize: 17 }} />,  label: "Delivery Confirmation", desc: "Send WhatsApp message to customer when their order is marked delivered.", color: "#16a34a" },
-              { key: "notify_pending_eod", icon: <NotificationsIcon sx={{ fontSize: 17 }} />, label: "Pending Orders Alert",  desc: "Alert you if any orders are still pending at end of day.", color: "#f97316" },
-            ].map((row, i, arr) => (
-              <Box key={row.key}>
-                <SettingRow icon={row.icon} label={row.label} desc={row.desc}
-                  checked={!!s[row.key]} onChange={() => toggleS(row.key)} color={row.color} dark={dark} />
-                {i < arr.length - 1 && <Divider sx={{ borderColor: border }} />}
-              </Box>
-            ))}
-          </Section>
-
-          {/* Danger Zone */}
-          <Paper elevation={0} sx={{ borderRadius: 3, border: `1px solid ${dark ? "#450a0a" : "#fecaca"}`, overflow: "hidden", background: bg }}>
-            <Box sx={{ px: 2.5, py: 1.5, background: dark ? "#1c0a0a" : "#fff5f5", borderBottom: `1px solid ${dark ? "#450a0a" : "#fecaca"}`, display: "flex", alignItems: "center", gap: 1 }}>
-              <WarningAmberIcon fontSize="small" sx={{ color: "#dc2626" }} />
-              <Typography fontWeight={700} fontSize={13} color="#dc2626">Danger Zone</Typography>
+          {/* Auto-generate Time */}
+          <Paper elevation={0} sx={{ borderRadius: 3, border: `1px solid ${border}`, background: bg, mb: 2, overflow: "hidden" }}>
+            <Box sx={{ px: 2.5, py: 1.5, background: bgCard, borderBottom: `1px solid ${border}`, display: "flex", alignItems: "center", gap: 1 }}>
+              <AutorenewIcon fontSize="small" sx={{ color: "#2563eb" }} />
+              <Typography fontWeight={700} fontSize={13} color={textPrimary}>Auto-generate Orders</Typography>
             </Box>
             <Box sx={{ px: 2.5, py: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
-              <Box>
-                <Typography fontWeight={600} fontSize={13.5} color={textPrimary}>Reset Today's Orders</Typography>
-                <Typography fontSize={12} color={textSecondary}>Mark all today's orders as pending. Cannot be undone.</Typography>
+              <Box flex={1}>
+                <Typography fontWeight={600} fontSize={13.5} color={textPrimary}>Daily Generation Time</Typography>
+                <Typography fontSize={12} color={textSecondary} mt={0.2}>
+                  Orders will be automatically generated at this time each day based on active subscriptions.
+                </Typography>
               </Box>
-              <Button size="small" variant="outlined"
-                sx={{ textTransform: "none", fontWeight: 600, fontSize: 12, borderRadius: "8px", borderColor: "#dc2626", color: "#dc2626", "&:hover": { background: "#fef2f2", borderColor: "#dc2626" } }}>
-                Reset Orders
-              </Button>
+              <TextField size="small" type="time"
+                value={s.auto_generate_time || ""}
+                onChange={(e) => { setS((prev) => ({ ...prev, auto_generate_time: e.target.value })); setSDirty(true); setSSaved(false) }}
+                sx={{ width: 130, "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 15, fontWeight: 700 } }} />
             </Box>
           </Paper>
         </>

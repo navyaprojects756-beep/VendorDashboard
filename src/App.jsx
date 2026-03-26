@@ -8,6 +8,7 @@ import Orders from "./pages/Orders"
 import Apartments from "./pages/Apartments"
 import Blocks from "./pages/Blocks"
 import Settings from "./pages/Settings"
+import Customers from "./pages/Customers"
 
 export default function App(){
 
@@ -20,16 +21,17 @@ export default function App(){
   })
 
   const render=()=>{
-    if(page==="orders") return <Orders/>
-    if(page==="apartments") return <Apartments/>
-    if(page==="blocks") return <Blocks/>
-    if(page==="settings") return <Settings/>
+    if(page==="orders") return <Orders dark={dark}/>
+    if(page==="apartments") return <Apartments dark={dark}/>
+    if(page==="blocks") return <Blocks dark={dark}/>
+    if(page==="settings") return <Settings dark={dark}/>
+    if(page==="customers") return <Customers dark={dark}/>
   }
 
   return (
     <ThemeProvider theme={theme}>
-      <Sidebar open={open} setOpen={setOpen} setPage={setPage}/>
-      <Header setOpen={setOpen} setDark={setDark}/>
+      <Sidebar open={open} setOpen={setOpen} setPage={setPage} dark={dark}/>
+      <Header setOpen={setOpen} setDark={setDark} dark={dark}/>
       <div style={{padding:"90px 20px 20px 20px"}}>
         {render()}
       </div>

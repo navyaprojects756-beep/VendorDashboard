@@ -1,24 +1,17 @@
-import { AppBar, Toolbar, Typography, IconButton, Button, Box, Tooltip, Avatar } from "@mui/material"
+import { AppBar, Toolbar, Typography, IconButton, Box, Avatar } from "@mui/material"
 import MenuIcon from "@mui/icons-material/Menu"
-import AutorenewIcon from "@mui/icons-material/Autorenew"
 import DarkModeIcon from "@mui/icons-material/DarkMode"
 import LightModeIcon from "@mui/icons-material/LightMode"
 import LocalDrinkIcon from "@mui/icons-material/LocalDrink"
 import API, { getToken } from "../services/api"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 export default function Header({ setOpen, dark, setDark }) {
-  const [generating, setGenerating] = useState(false)
+  const [profile, setProfile] = useState({})
 
-  const generate = async () => {
-    setGenerating(true)
-    try {
-      await API.post(`/generate-orders?token=${getToken()}`)
-      window.location.reload()
-    } finally {
-      setGenerating(false)
-    }
-  }
+  useEffect(() => {
+    API.get(`/profile?token=${getToken()}`).then((r) => setProfile(r.data)).catch(() => {})
+  }, [])
 
   return (
     <AppBar
@@ -47,27 +40,35 @@ export default function Header({ setOpen, dark, setDark }) {
         </IconButton>
 
         <Box display="flex" alignItems="center" gap={1}>
-          <Box
+          <Avatar
+            src={profile.logo_url || ""}
+            variant="rounded"
             sx={{
-              width: 28,
-              height: 28,
+              width: 30,
+              height: 30,
               borderRadius: "8px",
               background: "linear-gradient(135deg,#2563eb,#3b82f6)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              border: `1px solid ${dark ? "#1e293b" : "#e5e7eb"}`,
             }}
           >
             <LocalDrinkIcon sx={{ fontSize: 16, color: "white" }} />
+          </Avatar>
+          <Box>
+            <Typography
+              fontWeight={700}
+              fontSize={14}
+              letterSpacing="-0.3px"
+              lineHeight={1.1}
+              sx={{ color: dark ? "#f1f5f9" : "#111827" }}
+            >
+              {profile.business_name || "MilkRoute"}
+            </Typography>
+            {(profile.area || profile.city) && (
+              <Typography fontSize={10} lineHeight={1.1} sx={{ color: dark ? "#64748b" : "#9ca3af" }}>
+                {[profile.area, profile.city].filter(Boolean).join(", ")}
+              </Typography>
+            )}
           </Box>
-          <Typography
-            fontWeight={700}
-            fontSize={15}
-            letterSpacing="-0.3px"
-            sx={{ color: dark ? "#f1f5f9" : "#111827" }}
-          >
-            MilkRoute
-          </Typography>
           <Box
             sx={{
               ml: 0.5,
@@ -90,47 +91,18 @@ export default function Header({ setOpen, dark, setDark }) {
         {/* Right actions */}
         <Box display="flex" alignItems="center" gap={0.5}>
 
-          <Tooltip title="Generate today's orders">
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={
-                <AutorenewIcon
-                  fontSize="small"
-                  sx={{
-                    animation: generating ? "spin 1s linear infinite" : "none",
-                    "@keyframes spin": { "0%": { transform: "rotate(0deg)" }, "100%": { transform: "rotate(360deg)" } },
-                  }}
-                />
-              }
-              onClick={generate}
-              disabled={generating}
-              sx={{
-                fontSize: 12,
-                fontWeight: 600,
-                textTransform: "none",
-                borderRadius: "8px",
-                borderColor: dark ? "#334155" : "#e5e7eb",
-                color: dark ? "#94a3b8" : "#374151",
-                "&:hover": { borderColor: "#2563eb", color: "#2563eb", background: "transparent" },
-              }}
-            >
-              {generating ? "Generating…" : "Generate"}
-            </Button>
-          </Tooltip>
+          <IconButton
+            size="small"
+            onClick={() => setDark((p) => !p)}
+            title={dark ? "Light mode" : "Dark mode"}
+            sx={{
+              color: dark ? "#94a3b8" : "#6b7280",
+              "&:hover": { background: dark ? "#1e293b" : "#f3f4f6" },
+            }}
+          >
+            {dark ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+          </IconButton>
 
-          <Tooltip title={dark ? "Light mode" : "Dark mode"}>
-            <IconButton
-              size="small"
-              onClick={() => setDark((p) => !p)}
-              sx={{
-                color: dark ? "#94a3b8" : "#6b7280",
-                "&:hover": { background: dark ? "#1e293b" : "#f3f4f6" },
-              }}
-            >
-              {dark ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
-            </IconButton>
-          </Tooltip>
 
           <Avatar
             sx={{
@@ -142,7 +114,7 @@ export default function Header({ setOpen, dark, setDark }) {
               ml: 0.5,
             }}
           >
-            V
+            {(profile.business_name?.[0] || "V").toUpperCase()}
           </Avatar>
 
         </Box>
