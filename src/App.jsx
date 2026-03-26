@@ -1,17 +1,20 @@
 import { useState } from "react"
+import { Routes, Route, Navigate } from "react-router-dom"
 import { ThemeProvider, createTheme } from "@mui/material/styles"
-import { CssBaseline } from "@mui/material"
-import Sidebar from "./layout/Sidebar"
-import Header from "./layout/Header"
+import Sidebar from "./dashboard/layout/Sidebar"
+import Header from "./dashboard/layout/Header"
 
-import Orders from "./pages/Orders"
-import Apartments from "./pages/Apartments"
-import Blocks from "./pages/Blocks"
-import Settings from "./pages/Settings"
-import Customers from "./pages/Customers"
+import Orders from "./dashboard/pages/Orders"
+import Apartments from "./dashboard/pages/Apartments"
+import Blocks from "./dashboard/pages/Blocks"
+import Settings from "./dashboard/pages/Settings"
+import Customers from "./dashboard/pages/Customers"
 
-export default function App(){
+import HomePage from "./company/HomePage"
+import AboutPage from "./company/AboutPage"
+import PrivacyPage from "./company/PrivacyPage"
 
+function VendorDashboard() {
   const [page,setPage]=useState("orders")
   const [open,setOpen]=useState(false)
   const [dark,setDark]=useState(false)
@@ -36,5 +39,17 @@ export default function App(){
         {render()}
       </div>
     </ThemeProvider>
+  )
+}
+
+export default function App(){
+  return (
+    <Routes>
+      <Route path="/"        element={<HomePage />} />
+      <Route path="/about"   element={<AboutPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
+      <Route path="/dashboard" element={<VendorDashboard />} />
+      <Route path="*"        element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }

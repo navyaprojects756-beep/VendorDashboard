@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import API, { getToken } from "../services/api"
+import API, { getToken } from "../../services/api"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 

@@ -3,7 +3,7 @@ import MenuIcon from "@mui/icons-material/Menu"
 import DarkModeIcon from "@mui/icons-material/DarkMode"
 import LightModeIcon from "@mui/icons-material/LightMode"
 import LocalDrinkIcon from "@mui/icons-material/LocalDrink"
-import API, { getToken } from "../services/api"
+import API, { getToken } from "../../services/api"
 import { useState, useEffect } from "react"
 
 export default function Header({ setOpen, dark, setDark }) {
