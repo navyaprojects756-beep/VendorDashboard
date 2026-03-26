@@ -8,24 +8,23 @@ import {
   InputAdornment, Button, Dialog, DialogTitle, DialogContent,
   DialogActions, CircularProgress, ToggleButtonGroup, ToggleButton,
   Divider, Table, TableHead, TableRow, TableCell, TableBody,
-  IconButton,
+  IconButton, LinearProgress, Tooltip,
 } from "@mui/material"
 
-import SearchIcon        from "@mui/icons-material/Search"
-import ApartmentIcon     from "@mui/icons-material/Apartment"
-import PeopleIcon        from "@mui/icons-material/People"
-import ReceiptLongIcon   from "@mui/icons-material/ReceiptLong"
-import DownloadIcon      from "@mui/icons-material/Download"
-import PhoneIcon         from "@mui/icons-material/Phone"
-import LocationOnIcon    from "@mui/icons-material/LocationOn"
-import CloseIcon         from "@mui/icons-material/Close"
-import CheckCircleIcon   from "@mui/icons-material/CheckCircle"
-import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty"
-import RefreshIcon       from "@mui/icons-material/Refresh"
+import SearchIcon         from "@mui/icons-material/Search"
+import ApartmentIcon      from "@mui/icons-material/Apartment"
+import PeopleIcon         from "@mui/icons-material/People"
+import ReceiptLongIcon    from "@mui/icons-material/ReceiptLong"
+import DownloadIcon       from "@mui/icons-material/Download"
+import LocationOnIcon     from "@mui/icons-material/LocationOn"
+import CloseIcon          from "@mui/icons-material/Close"
+import CheckCircleIcon    from "@mui/icons-material/CheckCircle"
+import RefreshIcon        from "@mui/icons-material/Refresh"
+import FileDownloadIcon   from "@mui/icons-material/FileDownload"
+import CloudDownloadIcon  from "@mui/icons-material/CloudDownload"
 
 /* ── date helpers ── */
 const toDateStr = (d) => d.toISOString().split("T")[0]
-
 const getWeekRange = () => {
   const now = new Date()
   const mon = new Date(now); mon.setDate(now.getDate() - ((now.getDay() + 6) % 7))
@@ -39,33 +38,173 @@ const getMonthRange = () => {
     to:   toDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
   }
 }
-const getRange = (mode, customFrom, customTo) => {
+const getRange = (mode, cFrom, cTo) => {
   if (mode === "week")  return getWeekRange()
   if (mode === "month") return getMonthRange()
-  return { from: customFrom, to: customTo }
+  return { from: cFrom, to: cTo }
+}
+const fmtDate = (str) => {
+  const d = new Date(str)
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+}
+
+/* ── build invoice PDF (only delivered orders) ── */
+function buildPDF(data, from, to) {
+  const { customer, orders, price_per_unit, vendor } = data
+  const delivered = orders.filter((o) => o.is_delivered)
+  if (delivered.length === 0) return null
+
+  const doc       = new jsPDF()
+  const pageW     = doc.internal.pageSize.getWidth()
+  const rate      = Number(price_per_unit)
+  const totalQty  = delivered.reduce((s, o) => s + o.quantity, 0)
+  const totalAmt  = delivered.reduce((s, o) => s + o.quantity * rate, 0)
+  const invNo     = `INV-${from.replace(/-/g, "")}-${String(customer.phone).slice(-4)}`
+  const bizName   = vendor.business_name || "MilkRoute"
+  const bizAddr   = [vendor.area, vendor.city].filter(Boolean).join(", ")
+
+  doc.setFillColor(30, 64, 175)
+  doc.rect(0, 0, pageW, 38, "F")
+  doc.setFillColor(37, 99, 235)
+  doc.rect(0, 30, pageW, 8, "F")
+
+  doc.setTextColor(255, 255, 255)
+  doc.setFontSize(20); doc.setFont("helvetica", "bold")
+  doc.text("MILK INVOICE", 14, 15)
+  doc.setFontSize(9.5); doc.setFont("helvetica", "normal")
+  doc.text(bizName, pageW - 14, 11, { align: "right" })
+  if (bizAddr) doc.text(bizAddr, pageW - 14, 18, { align: "right" })
+  if (vendor.whatsapp_number) doc.text(`Ph: ${vendor.whatsapp_number}`, pageW - 14, 25, { align: "right" })
+
+  doc.setFontSize(8.5)
+  doc.text(`Invoice No: ${invNo}`, 14, 36)
+  doc.text(`Generated: ${toDateStr(new Date())}`, pageW - 14, 36, { align: "right" })
+
+  doc.setTextColor(30, 30, 30)
+  const boxTop = 44
+  doc.setFillColor(247, 248, 250)
+  doc.roundedRect(14, boxTop, 88, 30, 2, 2, "F")
+  doc.setFontSize(8); doc.setFont("helvetica", "bold"); doc.setTextColor(100, 100, 100)
+  doc.text("BILL TO", 19, boxTop + 7)
+  doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.setTextColor(20, 20, 20)
+  doc.text(String(customer.phone), 19, boxTop + 14)
+  if (customer.address) {
+    doc.setFontSize(8.5); doc.setFont("helvetica", "normal"); doc.setTextColor(80, 80, 80)
+    doc.text(customer.address, 19, boxTop + 21, { maxWidth: 78 })
+  }
+
+  doc.setFillColor(239, 246, 255)
+  doc.roundedRect(108, boxTop, 88, 30, 2, 2, "F")
+  doc.setFontSize(8); doc.setFont("helvetica", "bold"); doc.setTextColor(100, 100, 100)
+  doc.text("BILLING PERIOD", 113, boxTop + 7)
+  doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.setTextColor(30, 64, 175)
+  doc.text(fmtDate(from), 113, boxTop + 15)
+  doc.setFontSize(8.5); doc.setFont("helvetica", "normal"); doc.setTextColor(80, 80, 80)
+  doc.text("to", 113, boxTop + 21)
+  doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.setTextColor(30, 64, 175)
+  doc.text(fmtDate(to), 113, boxTop + 28)
+
+  autoTable(doc, {
+    startY: boxTop + 36,
+    head: [["#", "Delivery Date", "Packets", "Rate / Packet", "Amount"]],
+    body: delivered.map((o, i) => [
+      i + 1,
+      fmtDate(String(o.order_date).slice(0, 10)),
+      o.quantity,
+      `Rs. ${rate.toFixed(2)}`,
+      `Rs. ${(o.quantity * rate).toFixed(2)}`,
+    ]),
+    headStyles: {
+      fillColor: [30, 64, 175], textColor: [255, 255, 255],
+      fontStyle: "bold", fontSize: 9.5, cellPadding: 4,
+    },
+    bodyStyles: { fontSize: 9.5, cellPadding: 3.5 },
+    alternateRowStyles: { fillColor: [248, 250, 255] },
+    columnStyles: {
+      0: { cellWidth: 10, halign: "center" },
+      2: { halign: "center" },
+      3: { halign: "right" },
+      4: { halign: "right", fontStyle: "bold" },
+    },
+    styles: { overflow: "linebreak" },
+  })
+
+  const finalY = doc.lastAutoTable.finalY
+
+  doc.setFillColor(30, 64, 175)
+  doc.rect(14, finalY + 4, pageW - 28, 0.4, "F")
+
+  const tBox = finalY + 8
+  doc.setFillColor(239, 246, 255)
+  doc.roundedRect(pageW - 80, tBox, 66, 28, 2, 2, "F")
+  doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(80, 80, 80)
+  doc.text("Total Packets Delivered:", pageW - 76, tBox + 8)
+  doc.text("Rate per Packet:", pageW - 76, tBox + 16)
+  doc.setFontSize(11); doc.setFont("helvetica", "bold"); doc.setTextColor(30, 64, 175)
+  doc.text("Total Amount:", pageW - 76, tBox + 26)
+
+  doc.setFontSize(9); doc.setFont("helvetica", "bold"); doc.setTextColor(20, 20, 20)
+  doc.text(String(totalQty), pageW - 18, tBox + 8, { align: "right" })
+  doc.text(`Rs. ${rate.toFixed(2)}`, pageW - 18, tBox + 16, { align: "right" })
+  doc.setFontSize(11.5); doc.setTextColor(30, 64, 175)
+  doc.text(`Rs. ${totalAmt.toFixed(2)}`, pageW - 18, tBox + 26, { align: "right" })
+
+  doc.setFontSize(8.5); doc.setFont("helvetica", "italic"); doc.setTextColor(120, 120, 120)
+  doc.text("Thank you for your continued support!", 14, tBox + 12)
+  doc.text("* This invoice covers only delivered milk packets for the stated period.", 14, tBox + 19)
+
+  const footerY = 283
+  doc.setFillColor(30, 64, 175)
+  doc.rect(0, footerY - 2, pageW, 0.3, "F")
+  doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(140, 140, 140)
+  doc.text(bizName, 14, footerY + 4)
+  doc.text("Generated by MilkRoute Vendor Dashboard", pageW / 2, footerY + 4, { align: "center" })
+  doc.text(`Invoice: ${invNo}`, pageW - 14, footerY + 4, { align: "right" })
+
+  return doc
 }
 
 /* ═══════════════════════════════════════════
    MAIN
 ═══════════════════════════════════════════ */
 export default function Customers({ dark }) {
-  const [customers, setCustomers] = useState([])
-  const [filtered,  setFiltered]  = useState([])
-  const [loading,   setLoading]   = useState(true)
+  const [customers,  setCustomers]  = useState([])
+  const [filtered,   setFiltered]   = useState([])
+  const [loading,    setLoading]    = useState(true)
 
-  const [search,    setSearch]    = useState("")
-  const [aptFilter, setAptFilter] = useState("")
+  const [search,     setSearch]     = useState("")
+  const [aptFilter,  setAptFilter]  = useState("")
   const [apartments, setApartments] = useState([])
 
-  /* invoice dialog */
-  const [dialogOpen,    setDialogOpen]    = useState(false)
-  const [selCustomer,   setSelCustomer]   = useState(null)
-  const [invoiceData,   setInvoiceData]   = useState(null)
-  const [invLoading,    setInvLoading]    = useState(false)
+  /* shared date range */
+  const [dateMode, setDateMode] = useState("month")
+  const [fromDate, setFromDate] = useState(getMonthRange().from)
+  const [toDate,   setToDate]   = useState(getMonthRange().to)
 
-  const [dateMode,  setDateMode]  = useState("month")
-  const [fromDate,  setFromDate]  = useState(getMonthRange().from)
-  const [toDate,    setToDate]    = useState(getMonthRange().to)
+  /* individual invoice dialog */
+  const [dialogOpen,  setDialogOpen]  = useState(false)
+  const [selCustomer, setSelCustomer] = useState(null)
+  const [invoiceData, setInvoiceData] = useState(null)
+  const [invLoading,  setInvLoading]  = useState(false)
+
+  /* bulk generate state */
+  const [bulkRunning, setBulkRunning] = useState(false)
+  const [bulkDone,    setBulkDone]    = useState(0)
+  const [bulkTotal,   setBulkTotal]   = useState(0)
+  const [bulkSkipped, setBulkSkipped] = useState(0)
+
+  /* stored generated invoice data */
+  const [generatedData,   setGeneratedData]   = useState(new Map()) // customerId -> invoiceData (delivered only)
+  const [generatedPeriod, setGeneratedPeriod] = useState(null)      // { from, to }
+
+  /* bulk download state */
+  const [downloadingAll, setDownloadingAll] = useState(false)
+  const [dlDone,         setDlDone]         = useState(0)
+  const [dlTotal,        setDlTotal]        = useState(0)
+  const [dlFinished,     setDlFinished]     = useState(false)
+
+  /* per-customer download */
+  const [downloadingCustomer, setDownloadingCustomer] = useState(null)
 
   /* theme */
   const border        = dark ? "#1e293b" : "#e5e7eb"
@@ -74,7 +213,14 @@ export default function Customers({ dark }) {
   const textPrimary   = dark ? "#f1f5f9" : "#111827"
   const textSecondary = dark ? "#94a3b8" : "#6b7280"
 
-  /* ── load ── */
+  /* clear generated data when period changes */
+  useEffect(() => {
+    setGeneratedData(new Map())
+    setGeneratedPeriod(null)
+    setDlFinished(false)
+  }, [dateMode, fromDate, toDate])
+
+  /* ── load customers ── */
   useEffect(() => {
     API.get(`/customers?token=${getToken()}`)
       .then((r) => {
@@ -95,112 +241,124 @@ export default function Customers({ dark }) {
     setFiltered(data)
   }, [search, aptFilter, customers])
 
-  /* ── fetch invoice ── */
+  /* ── fetch one invoice (dialog) ── */
   const fetchInvoice = async (customerId) => {
-    setInvLoading(true)
-    setInvoiceData(null)
+    setInvLoading(true); setInvoiceData(null)
     const { from, to } = getRange(dateMode, fromDate, toDate)
     try {
       const r = await API.get(`/customers/${customerId}/invoice?token=${getToken()}&from=${from}&to=${to}`)
       setInvoiceData(r.data)
-    } finally {
-      setInvLoading(false)
-    }
+    } finally { setInvLoading(false) }
   }
 
   const openInvoice = (customer) => {
-    setSelCustomer(customer)
-    setDialogOpen(true)
+    setSelCustomer(customer); setDialogOpen(true)
     fetchInvoice(customer.customer_id)
   }
 
-  /* ── PDF ── */
-  const downloadPDF = () => {
+  /* ── download single PDF from dialog ── */
+  const downloadSinglePDF = () => {
     if (!invoiceData) return
-    const { customer, orders, price_per_unit, vendor } = invoiceData
     const { from, to } = getRange(dateMode, fromDate, toDate)
+    const deliveredOnly = { ...invoiceData, orders: invoiceData.orders.filter((o) => o.is_delivered) }
+    const doc = buildPDF(deliveredOnly, from, to)
+    if (!doc) return
+    doc.save(`invoice_${invoiceData.customer.phone}_${from}_${to}.pdf`)
+  }
 
-    const doc = new jsPDF()
+  /* ── per-customer download icon ── */
+  const downloadCustomerInvoice = async (customer) => {
+    const { from, to } = generatedPeriod || getRange(dateMode, fromDate, toDate)
 
-    /* header band */
-    doc.setFillColor(37, 99, 235)
-    doc.rect(0, 0, 210, 34, "F")
-    doc.setTextColor(255, 255, 255)
-    doc.setFontSize(22); doc.setFont("helvetica", "bold")
-    doc.text("INVOICE", 14, 14)
-    doc.setFontSize(11); doc.setFont("helvetica", "normal")
-    doc.text(vendor.business_name || "MilkRoute", 14, 23)
-    if (vendor.area || vendor.city)
-      doc.text([vendor.area, vendor.city].filter(Boolean).join(", "), 14, 30)
+    /* use pre-generated data if available */
+    if (generatedData.has(customer.customer_id) && generatedPeriod) {
+      const data = generatedData.get(customer.customer_id)
+      const doc  = buildPDF(data, generatedPeriod.from, generatedPeriod.to)
+      if (doc) doc.save(`invoice_${customer.phone}_${generatedPeriod.from}_${generatedPeriod.to}.pdf`)
+      return
+    }
 
-    /* bill-to */
-    doc.setTextColor(30, 30, 30)
-    doc.setFontSize(10); doc.setFont("helvetica", "bold")
-    doc.text("Bill To", 14, 46)
-    doc.setFont("helvetica", "normal")
-    doc.text(customer.phone, 14, 53)
-    if (customer.address)
-      doc.text(customer.address, 14, 59, { maxWidth: 85 })
+    /* fetch on demand */
+    setDownloadingCustomer(customer.customer_id)
+    try {
+      const { from: f, to: t } = getRange(dateMode, fromDate, toDate)
+      const r = await API.get(`/customers/${customer.customer_id}/invoice?token=${getToken()}&from=${f}&to=${t}`)
+      const deliveredOnly = { ...r.data, orders: r.data.orders.filter((o) => o.is_delivered) }
+      const doc = buildPDF(deliveredOnly, f, t)
+      if (doc) doc.save(`invoice_${customer.phone}_${f}_${t}.pdf`)
+    } finally {
+      setDownloadingCustomer(null)
+    }
+  }
 
-    /* period */
-    doc.setFont("helvetica", "bold")
-    doc.text("Billing Period", 120, 46)
-    doc.setFont("helvetica", "normal")
-    doc.text(`${from}  →  ${to}`, 120, 53)
+  /* ── GENERATE all: fetch & store, no download ── */
+  const generateAllInvoices = async () => {
+    setBulkRunning(true)
+    setBulkDone(0); setBulkSkipped(0); setBulkTotal(filtered.length)
+    setGeneratedData(new Map())
+    setGeneratedPeriod(null)
+    setDlFinished(false)
 
-    /* table */
-    const rows = orders.map((o, i) => [
-      i + 1,
-      String(o.order_date).slice(0, 10),
-      o.quantity,
-      `₹${Number(price_per_unit).toFixed(2)}`,
-      `₹${(o.quantity * price_per_unit).toFixed(2)}`,
-      o.is_delivered ? "Delivered" : "Pending",
-    ])
+    const { from, to } = getRange(dateMode, fromDate, toDate)
+    const newMap = new Map()
+    let skipped = 0
 
-    autoTable(doc, {
-      startY: 70,
-      head: [["#", "Date", "Qty", "Rate/unit", "Amount", "Status"]],
-      body: rows,
-      headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 10 },
-      bodyStyles: { fontSize: 10 },
-      alternateRowStyles: { fillColor: [239, 246, 255] },
-      columnStyles: { 0: { cellWidth: 10 }, 5: { cellWidth: 28 } },
-      didParseCell(data) {
-        if (data.section === "body" && data.column.index === 5) {
-          const val = data.cell.raw
-          data.cell.styles.textColor = val === "Delivered" ? [22, 163, 74] : [249, 115, 22]
+    for (let i = 0; i < filtered.length; i++) {
+      const c = filtered[i]
+      try {
+        const r = await API.get(`/customers/${c.customer_id}/invoice?token=${getToken()}&from=${from}&to=${to}`)
+        const deliveredOrders = r.data.orders.filter((o) => o.is_delivered)
+        if (deliveredOrders.length > 0) {
+          newMap.set(c.customer_id, { ...r.data, orders: deliveredOrders })
+        } else {
+          skipped++
         }
-      },
-    })
+      } catch { skipped++ }
 
-    const finalY = doc.lastAutoTable.finalY + 10
-    const totalQty = orders.reduce((s, o) => s + o.quantity, 0)
-    const totalAmt = orders.reduce((s, o) => s + o.quantity * price_per_unit, 0)
-    const paidAmt  = orders.filter((o) => o.is_delivered).reduce((s, o) => s + o.quantity * price_per_unit, 0)
+      setBulkDone(i + 1)
+      setBulkSkipped(skipped)
+    }
 
-    /* summary box */
-    doc.setFillColor(239, 246, 255)
-    doc.roundedRect(14, finalY - 4, 182, 30, 3, 3, "F")
-    doc.setFontSize(10.5); doc.setFont("helvetica", "bold"); doc.setTextColor(30, 30, 30)
-    doc.text(`Total Qty: ${totalQty}`, 20, finalY + 4)
-    doc.text(`Total Amount: ₹${totalAmt.toFixed(2)}`, 20, finalY + 12)
-    doc.setTextColor(22, 163, 74)
-    doc.text(`Delivered Amount: ₹${paidAmt.toFixed(2)}`, 20, finalY + 20)
-    doc.setTextColor(249, 115, 22)
-    doc.text(`Pending Amount: ₹${(totalAmt - paidAmt).toFixed(2)}`, 110, finalY + 12)
+    setGeneratedData(newMap)
+    setGeneratedPeriod({ from, to })
+    setBulkRunning(false)
+  }
 
-    /* footer */
-    doc.setTextColor(160, 160, 160); doc.setFontSize(8.5); doc.setFont("helvetica", "normal")
-    doc.text("Generated by MilkRoute Vendor Dashboard", 105, 287, { align: "center" })
+  /* ── DOWNLOAD all: use stored data ── */
+  const downloadAllInvoices = async () => {
+    if (!generatedPeriod || generatedData.size === 0) return
+    setDownloadingAll(true)
+    setDlFinished(false)
+    setDlDone(0)
+    const entries = [...generatedData.entries()]
+    setDlTotal(entries.length)
+    const { from, to } = generatedPeriod
 
-    doc.save(`invoice_${customer.phone}_${from}_${to}.pdf`)
+    for (let i = 0; i < entries.length; i++) {
+      const [, data] = entries[i]
+      const doc = buildPDF(data, from, to)
+      if (doc) {
+        doc.save(`invoice_${data.customer.phone}_${from}_${to}.pdf`)
+        await new Promise((res) => setTimeout(res, 700))
+      }
+      setDlDone(i + 1)
+    }
+
+    setDownloadingAll(false)
+    setDlFinished(true)
   }
 
   /* ── stats ── */
   const activeCount = customers.filter((c) => c.subscription_status === "active").length
+  const { from: rFrom, to: rTo } = getRange(dateMode, fromDate, toDate)
+  const readyCount = generatedData.size
 
-  /* ═══ RENDER ═══ */
+  /* after generation, only show customers who have orders in the period */
+  const displayCustomers = generatedPeriod
+    ? filtered.filter((c) => generatedData.has(c.customer_id))
+    : filtered
+
+  /* ─────────────────────── RENDER ─────────────────────── */
   return (
     <Box sx={{ maxWidth: 780, margin: "auto", px: { xs: 1, sm: 2 }, py: 3 }}>
 
@@ -218,18 +376,120 @@ export default function Customers({ dark }) {
       {/* Stats */}
       <Box display="flex" gap={2} mb={2} flexWrap="wrap">
         {[
-          { label: "Total Customers", value: customers.length, color: "#2563eb", bg: "#eff6ff" },
-          { label: "Active Subscriptions", value: activeCount, color: "#16a34a", bg: "#f0fdf4" },
-          { label: "Inactive", value: customers.length - activeCount, color: "#f97316", bg: "#fff7ed" },
+          { label: "Total",    value: customers.length,               color: "#2563eb", bg: dark ? "#1e3a5f" : "#eff6ff" },
+          { label: "Active",   value: activeCount,                    color: "#16a34a", bg: dark ? "#14532d" : "#f0fdf4" },
+          { label: "Inactive", value: customers.length - activeCount, color: "#f97316", bg: dark ? "#431407" : "#fff7ed" },
         ].map((s) => (
-          <Paper key={s.label} elevation={0} sx={{ flex: "1 1 130px", p: 1.5, borderRadius: 3, border: `1px solid ${border}`, background: bg }}>
+          <Paper key={s.label} elevation={0} sx={{ flex: "1 1 100px", p: 1.5, borderRadius: 3, border: `1px solid ${border}`, background: bg }}>
             <Typography fontSize={11} color={textSecondary}>{s.label}</Typography>
-            <Typography fontWeight={700} fontSize={22} color={s.color}>{s.value}</Typography>
+            <Typography fontWeight={800} fontSize={24} color={s.color} lineHeight={1.1}>{s.value}</Typography>
           </Paper>
         ))}
       </Box>
 
-      {/* Filters */}
+      {/* ── Period + Bulk Invoice ── */}
+      <Paper elevation={0} sx={{ p: 2, mb: 2, borderRadius: 3, border: `1px solid ${border}`, background: bg }}>
+        <Typography fontWeight={700} fontSize={13} color={textPrimary} mb={1.5}>Invoice Period</Typography>
+
+        <Box display="flex" alignItems="center" gap={1} flexWrap="wrap" mb={1.5}>
+          <ToggleButtonGroup size="small" exclusive value={dateMode}
+            onChange={(_, v) => { if (v) setDateMode(v) }}
+            sx={{
+              "& .MuiToggleButton-root": { border: `1px solid ${border}`, color: textSecondary, px: 1.8, py: 0.5, fontSize: 12, fontWeight: 600, textTransform: "none" },
+              "& .Mui-selected": { background: "#2563eb !important", color: "white !important", borderColor: "#2563eb !important" },
+            }}>
+            <ToggleButton value="week">This Week</ToggleButton>
+            <ToggleButton value="month">This Month</ToggleButton>
+            <ToggleButton value="custom">Custom</ToggleButton>
+          </ToggleButtonGroup>
+
+          {dateMode === "custom" && (
+            <Box display="flex" alignItems="center" gap={0.8} flexWrap="wrap">
+              <TextField type="date" size="small" label="From" value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)} InputLabelProps={{ shrink: true }}
+                sx={{ width: 140, "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }} />
+              <Typography fontSize={13} color={textSecondary}>→</Typography>
+              <TextField type="date" size="small" label="To" value={toDate}
+                onChange={(e) => setToDate(e.target.value)} InputLabelProps={{ shrink: true }}
+                inputProps={{ min: fromDate }}
+                sx={{ width: 140, "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }} />
+            </Box>
+          )}
+        </Box>
+
+        <Box sx={{ p: 1.2, borderRadius: 2, background: bgCard, border: `1px solid ${border}`, mb: 1.5 }}>
+          <Typography fontSize={12} color={textSecondary}>
+            Period: <Box component="span" fontWeight={700} color={textPrimary}>{fmtDate(rFrom)} → {fmtDate(rTo)}</Box>
+          </Typography>
+        </Box>
+
+        {/* Generation progress */}
+        {bulkRunning && (
+          <Box mb={1.5}>
+            <Typography fontSize={12} color={textSecondary} mb={0.5}>
+              Fetching invoices… {bulkDone} / {bulkTotal}
+              {bulkSkipped > 0 && ` (${bulkSkipped} skipped — no deliveries)`}
+            </Typography>
+            <LinearProgress variant="determinate" value={(bulkDone / bulkTotal) * 100}
+              sx={{ borderRadius: 4, height: 6, backgroundColor: dark ? "#1e293b" : "#e5e7eb", "& .MuiLinearProgress-bar": { background: "#2563eb" } }} />
+          </Box>
+        )}
+
+        {/* Generation done — invoices ready */}
+        {!bulkRunning && generatedPeriod && readyCount > 0 && (
+          <Box sx={{ px: 1.5, py: 0.8, borderRadius: 2, background: dark ? "#1e3a5f" : "#eff6ff", border: `1px solid ${dark ? "#1d4ed8" : "#bfdbfe"}`, mb: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+            <CheckCircleIcon sx={{ fontSize: 15, color: "#2563eb" }} />
+            <Typography fontSize={12} color="#2563eb" fontWeight={600}>
+              {readyCount} invoice{readyCount !== 1 ? "s" : ""} ready
+              {bulkSkipped > 0 ? ` · ${bulkSkipped} skipped (no deliveries)` : ""}
+            </Typography>
+          </Box>
+        )}
+
+        {/* Download progress */}
+        {downloadingAll && (
+          <Box mb={1.5}>
+            <Typography fontSize={12} color={textSecondary} mb={0.5}>
+              Downloading… {dlDone} / {dlTotal}
+            </Typography>
+            <LinearProgress variant="determinate" value={(dlDone / dlTotal) * 100}
+              sx={{ borderRadius: 4, height: 6, backgroundColor: dark ? "#1e293b" : "#e5e7eb", "& .MuiLinearProgress-bar": { background: "#7c3aed" } }} />
+          </Box>
+        )}
+
+        {/* Download complete */}
+        {dlFinished && !downloadingAll && (
+          <Box sx={{ px: 1.5, py: 0.8, borderRadius: 2, background: dark ? "#14532d" : "#f0fdf4", border: `1px solid ${dark ? "#166534" : "#bbf7d0"}`, mb: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+            <CheckCircleIcon sx={{ fontSize: 15, color: "#16a34a" }} />
+            <Typography fontSize={12} color="#16a34a" fontWeight={600}>
+              All {dlTotal} invoice{dlTotal !== 1 ? "s" : ""} downloaded successfully.
+            </Typography>
+          </Box>
+        )}
+
+        {/* Action buttons */}
+        <Box display="flex" gap={1.5} flexWrap="wrap" alignItems="center">
+          <Button variant="contained"
+            startIcon={bulkRunning ? <CircularProgress size={14} color="inherit" /> : <FileDownloadIcon fontSize="small" />}
+            disabled={bulkRunning || downloadingAll || filtered.length === 0}
+            onClick={generateAllInvoices}
+            sx={{ textTransform: "none", fontWeight: 700, fontSize: 13, borderRadius: "8px", background: "#2563eb", "&:hover": { background: "#1d4ed8" } }}>
+            {bulkRunning ? `Fetching ${bulkDone}/${bulkTotal}…` : `Generate All Invoices (${filtered.length})`}
+          </Button>
+
+          {readyCount > 0 && !bulkRunning && (
+            <Button variant="contained"
+              startIcon={downloadingAll ? <CircularProgress size={14} color="inherit" /> : <CloudDownloadIcon fontSize="small" />}
+              disabled={downloadingAll}
+              onClick={downloadAllInvoices}
+              sx={{ textTransform: "none", fontWeight: 700, fontSize: 13, borderRadius: "8px", background: "#7c3aed", "&:hover": { background: "#6d28d9" } }}>
+              {downloadingAll ? `Downloading ${dlDone}/${dlTotal}…` : `Download All Invoices (${readyCount})`}
+            </Button>
+          )}
+        </Box>
+      </Paper>
+
+      {/* ── Filters ── */}
       <Paper elevation={0} sx={{ px: 1.5, py: 1.2, mb: 2, borderRadius: 3, border: `1px solid ${border}`, background: bg }}>
         <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
           <TextField size="small" placeholder="Search phone or address…" value={search}
@@ -239,114 +499,140 @@ export default function Customers({ dark }) {
           <Select size="small" value={aptFilter} displayEmpty
             onChange={(e) => setAptFilter(e.target.value)}
             startAdornment={<InputAdornment position="start"><ApartmentIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /></InputAdornment>}
-            sx={{ flex: "1 1 140px", borderRadius: 2, fontSize: 13 }}>
+            sx={{ flex: "1 1 150px", borderRadius: 2, fontSize: 13 }}>
             <MenuItem value="">All Apartments</MenuItem>
             {apartments.map((a) => <MenuItem key={a} value={a} sx={{ fontSize: 13 }}>{a}</MenuItem>)}
           </Select>
         </Box>
       </Paper>
 
-      {/* Count */}
       <Typography fontSize={13} color={textSecondary} mb={1} px={0.5}>
-        {filtered.length} customer{filtered.length !== 1 ? "s" : ""}
-        {aptFilter ? ` in ${aptFilter}` : ""}
+        {displayCustomers.length} customer{displayCustomers.length !== 1 ? "s" : ""}{aptFilter ? ` · ${aptFilter}` : ""}
+        {generatedPeriod && filtered.length !== displayCustomers.length && (
+          <Box component="span" sx={{ ml: 1, fontSize: 12, color: dark ? "#475569" : "#9ca3af" }}>
+            ({filtered.length - displayCustomers.length} hidden — no orders in period)
+          </Box>
+        )}
       </Typography>
 
-      {/* List */}
+      {/* ── Customer list ── */}
       <Paper elevation={0} sx={{ borderRadius: 3, border: `1px solid ${border}`, overflow: "hidden", background: bg }}>
-        {loading && (
-          <Box py={8} textAlign="center"><CircularProgress size={24} sx={{ color: "#2563eb" }} /></Box>
-        )}
-        {!loading && filtered.length === 0 && (
+        {loading && <Box py={8} textAlign="center"><CircularProgress size={24} sx={{ color: "#2563eb" }} /></Box>}
+        {!loading && displayCustomers.length === 0 && (
           <Box py={7} textAlign="center">
             <PeopleIcon sx={{ fontSize: 36, color: border, mb: 1, display: "block", mx: "auto" }} />
-            <Typography color={textSecondary} fontSize={14}>No customers found.</Typography>
+            <Typography color={textSecondary} fontSize={14}>
+              {generatedPeriod ? "No customers with orders in this period." : "No customers found."}
+            </Typography>
           </Box>
         )}
-        {!loading && filtered.map((c, i) => (
-          <Box key={c.customer_id}>
-            <Box sx={{ px: 2.5, py: 1.8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, "&:hover": { background: bgCard }, transition: "background 0.15s" }}>
-              <Box flex={1} minWidth={0}>
-                <Box display="flex" alignItems="center" gap={1} mb={0.4}>
-                  <PhoneIcon sx={{ fontSize: 14, color: textSecondary, flexShrink: 0 }} />
-                  <Typography fontWeight={700} fontSize={14} color={textPrimary}>{c.phone}</Typography>
-                  <Chip
-                    label={c.subscription_status === "active" ? "Active" : "Inactive"}
-                    size="small"
-                    sx={{
-                      fontSize: 10, fontWeight: 600, height: 18,
-                      background: c.subscription_status === "active" ? "#dcfce7" : "#fee2e2",
-                      color: c.subscription_status === "active" ? "#16a34a" : "#dc2626",
-                    }}
-                  />
-                </Box>
-                {c.address && (
-                  <Box display="flex" alignItems="center" gap={0.5}>
-                    <LocationOnIcon sx={{ fontSize: 13, color: textSecondary, flexShrink: 0 }} />
-                    <Typography fontSize={12} color={textSecondary} noWrap>{c.address}</Typography>
+
+        {!loading && displayCustomers.map((c, i) => {
+          const isActive    = c.subscription_status === "active"
+          const isGenerated = generatedData.has(c.customer_id)
+          const isDlLoading = downloadingCustomer === c.customer_id
+
+          return (
+            <Box key={c.customer_id}>
+              <Box sx={{ px: 2, py: 1.8, display: "flex", alignItems: "center", gap: 2, "&:hover": { background: bgCard }, transition: "background 0.15s" }}>
+
+                {/* LEFT */}
+                <Box flex={1} minWidth={0}>
+                  <Box display="flex" alignItems="center" gap={1} flexWrap="wrap" mb={0.4}>
+                    <Typography fontWeight={700} fontSize={14} color={textPrimary} sx={{ wordBreak: "break-all" }}>
+                      {c.phone}
+                    </Typography>
+                    <Chip
+                      label={isActive ? "Active" : "Inactive"}
+                      size="small"
+                      sx={{
+                        fontSize: 10, fontWeight: 700, height: 18, flexShrink: 0,
+                        background: isActive ? (dark ? "#14532d" : "#dcfce7") : (dark ? "#450a0a" : "#fee2e2"),
+                        color: isActive ? "#16a34a" : "#dc2626",
+                      }}
+                    />
                   </Box>
-                )}
+                  {c.address && (
+                    <Box display="flex" alignItems="center" gap={0.4}>
+                      <LocationOnIcon sx={{ fontSize: 12, color: textSecondary, flexShrink: 0 }} />
+                      <Typography fontSize={12} color={textSecondary}
+                        sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 260 }}>
+                        {c.address}
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+
+                {/* RIGHT */}
+                <Box display="flex" flexDirection="column" alignItems="flex-end" gap={0.8} flexShrink={0}>
+                  {c.subscription_quantity && (
+                    <Chip label={`Qty: ${c.subscription_quantity}`} size="small"
+                      sx={{ fontWeight: 700, fontSize: 11, background: dark ? "#1e3a5f" : "#eff6ff", color: "#2563eb" }} />
+                  )}
+                  <Box display="flex" alignItems="center" gap={0.5}>
+                    {/* Per-customer download icon */}
+                    <Tooltip title={isGenerated ? "Download invoice (ready)" : "Download invoice"} arrow>
+                      <span>
+                        <IconButton size="small"
+                          onClick={() => downloadCustomerInvoice(c)}
+                          disabled={isDlLoading || downloadingAll}
+                          sx={{
+                            border: `1px solid ${isGenerated ? "#7c3aed" : border}`,
+                            borderRadius: "7px",
+                            p: 0.5,
+                            color: isGenerated ? "#7c3aed" : textSecondary,
+                            background: isGenerated ? (dark ? "#2e1065" : "#faf5ff") : "transparent",
+                            "&:hover": { background: dark ? "#2e1065" : "#faf5ff", borderColor: "#7c3aed", color: "#7c3aed" },
+                          }}>
+                          {isDlLoading
+                            ? <CircularProgress size={14} sx={{ color: "#7c3aed" }} />
+                            : <DownloadIcon sx={{ fontSize: 16 }} />
+                          }
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+
+                    {/* View invoice dialog */}
+                    <Button size="small" variant="outlined" startIcon={<ReceiptLongIcon sx={{ fontSize: "14px !important" }} />}
+                      onClick={() => openInvoice(c)}
+                      sx={{ textTransform: "none", fontWeight: 600, fontSize: 11.5, borderRadius: "7px", borderColor: "#7c3aed", color: "#7c3aed", py: 0.4, "&:hover": { background: dark ? "#2e1065" : "#faf5ff" } }}>
+                      Invoice
+                    </Button>
+                  </Box>
+                </Box>
               </Box>
-              <Box display="flex" alignItems="center" gap={1} flexShrink={0}>
-                {c.subscription_quantity && (
-                  <Chip label={`Qty: ${c.subscription_quantity}`} size="small" color="primary" sx={{ fontWeight: 600, fontSize: 11 }} />
-                )}
-                <Button size="small" variant="outlined" startIcon={<ReceiptLongIcon fontSize="small" />}
-                  onClick={() => openInvoice(c)}
-                  sx={{ textTransform: "none", fontWeight: 600, fontSize: 12, borderRadius: "8px", borderColor: "#7c3aed", color: "#7c3aed", "&:hover": { background: "#faf5ff", borderColor: "#7c3aed" } }}>
-                  Invoice
-                </Button>
-              </Box>
+              {i < displayCustomers.length - 1 && <Divider sx={{ borderColor: border }} />}
             </Box>
-            {i < filtered.length - 1 && <Divider sx={{ borderColor: border }} />}
-          </Box>
-        ))}
+          )
+        })}
       </Paper>
 
-      {/* ═══ INVOICE DIALOG ═══ */}
+      {/* ═══ INDIVIDUAL INVOICE DIALOG ═══ */}
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth
         PaperProps={{ sx: { borderRadius: 3, background: bg } }}>
+
         <DialogTitle sx={{ pb: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <Box>
-            <Typography fontWeight={700} fontSize={16} color={textPrimary}>
+            <Typography fontWeight={700} fontSize={15} color={textPrimary}>
               Invoice — {selCustomer?.phone}
             </Typography>
             {selCustomer?.address && (
-              <Typography fontSize={12} color={textSecondary}>{selCustomer.address}</Typography>
+              <Typography fontSize={11.5} color={textSecondary}>{selCustomer.address}</Typography>
             )}
           </Box>
           <IconButton size="small" onClick={() => setDialogOpen(false)}><CloseIcon fontSize="small" /></IconButton>
         </DialogTitle>
 
         <DialogContent dividers sx={{ borderColor: border }}>
-          {/* Date range selector */}
           <Box display="flex" alignItems="center" gap={1} flexWrap="wrap" mb={2}>
-            <ToggleButtonGroup size="small" exclusive value={dateMode}
-              onChange={(_, v) => { if (v) setDateMode(v) }}
-              sx={{ "& .MuiToggleButton-root": { border: `1px solid ${border}`, color: textSecondary, px: 1.6, py: 0.45, fontSize: 12, fontWeight: 600, textTransform: "none" },
-                    "& .Mui-selected": { background: "#2563eb !important", color: "white !important", borderColor: "#2563eb !important" } }}>
-              {[{ v: "week", l: "This Week" }, { v: "month", l: "This Month" }, { v: "custom", l: "Custom" }].map(({ v, l }) => (
-                <ToggleButton key={v} value={v}>{l}</ToggleButton>
-              ))}
-            </ToggleButtonGroup>
-
-            {dateMode === "custom" && (
-              <Box display="flex" alignItems="center" gap={0.8}>
-                <TextField type="date" size="small" label="From" value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)} InputLabelProps={{ shrink: true }}
-                  sx={{ width: 140, "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }} />
-                <Typography fontSize={13} color={textSecondary}>→</Typography>
-                <TextField type="date" size="small" label="To" value={toDate}
-                  onChange={(e) => setToDate(e.target.value)} InputLabelProps={{ shrink: true }}
-                  inputProps={{ min: fromDate }}
-                  sx={{ width: 140, "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }} />
-              </Box>
-            )}
-
+            <Typography fontSize={12} color={textSecondary}>Period:</Typography>
+            <Box sx={{ px: 1.5, py: 0.4, borderRadius: 2, background: bgCard, border: `1px solid ${border}` }}>
+              <Typography fontSize={12} fontWeight={700} color={textPrimary}>{fmtDate(rFrom)} → {fmtDate(rTo)}</Typography>
+            </Box>
             <Button size="small" variant="outlined" startIcon={<RefreshIcon fontSize="small" />}
               onClick={() => fetchInvoice(selCustomer?.customer_id)}
-              sx={{ textTransform: "none", fontWeight: 600, fontSize: 12, borderRadius: "8px", borderColor: border, color: textSecondary }}>
-              Apply
+              sx={{ textTransform: "none", fontWeight: 600, fontSize: 12, borderRadius: "7px", borderColor: border, color: textSecondary }}>
+              Refresh
             </Button>
           </Box>
 
@@ -354,20 +640,19 @@ export default function Customers({ dark }) {
 
           {!invLoading && invoiceData && (() => {
             const { orders, price_per_unit } = invoiceData
-            const totalQty = orders.reduce((s, o) => s + o.quantity, 0)
-            const totalAmt = orders.reduce((s, o) => s + o.quantity * price_per_unit, 0)
-            const paidAmt  = orders.filter((o) => o.is_delivered).reduce((s, o) => s + o.quantity * price_per_unit, 0)
+            const delivered = orders.filter((o) => o.is_delivered)
+            const rate      = Number(price_per_unit)
+            const totalQty  = delivered.reduce((s, o) => s + o.quantity, 0)
+            const totalAmt  = delivered.reduce((s, o) => s + o.quantity * rate, 0)
 
             return (
               <>
-                {/* Summary chips */}
                 <Box display="flex" gap={1.5} flexWrap="wrap" mb={2}>
                   {[
-                    { label: `${orders.length} orders`, color: "#2563eb", bg: "#eff6ff" },
-                    { label: `${totalQty} packets`, color: "#7c3aed", bg: "#faf5ff" },
-                    { label: `₹${totalAmt.toFixed(2)} total`, color: "#111827", bg: "#f3f4f6" },
-                    { label: `₹${paidAmt.toFixed(2)} delivered`, color: "#16a34a", bg: "#f0fdf4" },
-                    { label: `₹${(totalAmt - paidAmt).toFixed(2)} pending`, color: "#f97316", bg: "#fff7ed" },
+                    { label: `${delivered.length} deliveries`, color: "#2563eb", bg: dark ? "#1e3a5f" : "#eff6ff" },
+                    { label: `${totalQty} packets`,            color: "#7c3aed", bg: dark ? "#2e1065" : "#faf5ff" },
+                    { label: `Rs. ${totalAmt.toFixed(2)} total`, color: "#16a34a", bg: dark ? "#14532d" : "#f0fdf4" },
+                    { label: `Rs. ${rate.toFixed(2)} / packet`, color: "#f97316", bg: dark ? "#431407" : "#fff7ed" },
                   ].map((s) => (
                     <Box key={s.label} sx={{ px: 1.5, py: 0.5, borderRadius: 2, background: s.bg }}>
                       <Typography fontSize={12} fontWeight={700} color={s.color}>{s.label}</Typography>
@@ -375,50 +660,40 @@ export default function Customers({ dark }) {
                   ))}
                 </Box>
 
-                {orders.length === 0 ? (
+                {delivered.length === 0 ? (
                   <Box py={4} textAlign="center">
-                    <Typography color={textSecondary} fontSize={13}>No orders in this period.</Typography>
+                    <Typography color={textSecondary} fontSize={13}>No delivered orders in this period.</Typography>
                   </Box>
                 ) : (
                   <Box sx={{ overflowX: "auto" }}>
                     <Table size="small">
                       <TableHead>
                         <TableRow sx={{ background: bgCard }}>
-                          {["#", "Date", "Qty", "Rate/unit", "Amount", "Status"].map((h) => (
-                            <TableCell key={h} sx={{ fontWeight: 700, fontSize: 12, color: textSecondary, borderColor: border }}>{h}</TableCell>
+                          {["#", "Delivery Date", "Packets", "Rate / Packet", "Amount"].map((h) => (
+                            <TableCell key={h} sx={{ fontWeight: 700, fontSize: 11.5, color: textSecondary, borderColor: border }}>{h}</TableCell>
                           ))}
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {orders.map((o, i) => {
-                          const amt = o.quantity * price_per_unit
+                        {delivered.map((o, i) => {
+                          const amt = o.quantity * rate
                           return (
                             <TableRow key={i} sx={{ "&:hover": { background: bgCard } }}>
                               <TableCell sx={{ fontSize: 12, color: textSecondary, borderColor: border }}>{i + 1}</TableCell>
-                              <TableCell sx={{ fontSize: 12, color: textPrimary, borderColor: border, fontWeight: 500 }}>{String(o.order_date).slice(0, 10)}</TableCell>
-                              <TableCell sx={{ fontSize: 12, color: textPrimary, borderColor: border }}>{o.quantity}</TableCell>
-                              <TableCell sx={{ fontSize: 12, color: textSecondary, borderColor: border }}>₹{Number(price_per_unit).toFixed(2)}</TableCell>
-                              <TableCell sx={{ fontSize: 12, fontWeight: 700, color: textPrimary, borderColor: border }}>₹{amt.toFixed(2)}</TableCell>
-                              <TableCell sx={{ borderColor: border }}>
-                                <Chip
-                                  label={o.is_delivered ? "Delivered" : "Pending"}
-                                  size="small"
-                                  icon={o.is_delivered ? <CheckCircleIcon sx={{ fontSize: "12px !important" }} /> : <HourglassEmptyIcon sx={{ fontSize: "12px !important" }} />}
-                                  sx={{
-                                    fontSize: 11, fontWeight: 600, height: 20,
-                                    background: o.is_delivered ? "#dcfce7" : "#fff7ed",
-                                    color: o.is_delivered ? "#16a34a" : "#f97316",
-                                  }}
-                                />
+                              <TableCell sx={{ fontSize: 12, fontWeight: 600, color: textPrimary, borderColor: border }}>
+                                {fmtDate(String(o.order_date).slice(0, 10))}
                               </TableCell>
+                              <TableCell sx={{ fontSize: 12, color: textPrimary, borderColor: border }}>{o.quantity}</TableCell>
+                              <TableCell sx={{ fontSize: 12, color: textSecondary, borderColor: border }}>Rs. {rate.toFixed(2)}</TableCell>
+                              <TableCell sx={{ fontSize: 12, fontWeight: 700, color: "#2563eb", borderColor: border }}>Rs. {amt.toFixed(2)}</TableCell>
                             </TableRow>
                           )
                         })}
-                        {/* Total row */}
                         <TableRow sx={{ background: bgCard }}>
-                          <TableCell colSpan={4} sx={{ fontWeight: 700, fontSize: 13, color: textPrimary, borderColor: border }}>Total</TableCell>
-                          <TableCell sx={{ fontWeight: 700, fontSize: 13, color: "#2563eb", borderColor: border }}>₹{totalAmt.toFixed(2)}</TableCell>
+                          <TableCell colSpan={2} sx={{ fontWeight: 700, fontSize: 13, color: textPrimary, borderColor: border }}>Total</TableCell>
+                          <TableCell sx={{ fontWeight: 700, fontSize: 13, color: textPrimary, borderColor: border }}>{totalQty}</TableCell>
                           <TableCell sx={{ borderColor: border }} />
+                          <TableCell sx={{ fontWeight: 800, fontSize: 13, color: "#16a34a", borderColor: border }}>Rs. {totalAmt.toFixed(2)}</TableCell>
                         </TableRow>
                       </TableBody>
                     </Table>
@@ -429,13 +704,13 @@ export default function Customers({ dark }) {
           })()}
         </DialogContent>
 
-        <DialogActions sx={{ px: 2.5, py: 1.5, borderTop: `1px solid ${border}` }}>
+        <DialogActions sx={{ px: 2.5, py: 1.5 }}>
           <Button onClick={() => setDialogOpen(false)} sx={{ textTransform: "none", color: textSecondary }}>Close</Button>
           <Button variant="contained" startIcon={<DownloadIcon fontSize="small" />}
-            disabled={!invoiceData || invLoading || (invoiceData?.orders?.length === 0)}
-            onClick={downloadPDF}
+            disabled={!invoiceData || invLoading || invoiceData?.orders?.filter((o) => o.is_delivered).length === 0}
+            onClick={downloadSinglePDF}
             sx={{ textTransform: "none", fontWeight: 700, borderRadius: "8px", background: "#7c3aed", "&:hover": { background: "#6d28d9" } }}>
-            Download PDF
+            Download Invoice PDF
           </Button>
         </DialogActions>
       </Dialog>
