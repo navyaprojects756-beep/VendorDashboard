@@ -87,7 +87,7 @@ export default function AboutPage() {
               </span>
             </h2>
             {[
-              "Hi, I'm Navya — the founder of Navya Tech Solutions. I started this company because I wanted to build software that actually helps people, not just impressive-looking demos.",
+              "Hi, I'm Navya — the founder of Cheritech. I started this company because I wanted to build software that actually helps people, not just impressive-looking demos.",
               "My first product is a WhatsApp-based milk delivery management system — a tool that helps local milk vendors manage customers, orders, and subscriptions through a simple bot and vendor dashboard.",
               "We're just getting started. The goal is to build more tools for supply businesses, local service providers, and anyone who could benefit from smart, affordable technology."
             ].map((p, i) => (

@@ -107,9 +107,9 @@ export default function CompanyLayout({ children }) {
             display: "flex", alignItems: "center", justifyContent: "center",
             color: "white", fontWeight: 900, fontSize: "1.1rem",
             boxShadow: "0 4px 14px rgba(79,70,229,.35)"
-          }}>N</div>
+          }}>C</div>
           <span style={{ fontSize: "1.05rem", fontWeight: 800, color: "#0F172A", letterSpacing: -.3 }}>
-            Navya<span style={{ color: "#4F46E5" }}>Tech</span>
+            Cheritech
           </span>
         </Link>
 
@@ -174,8 +174,8 @@ export default function CompanyLayout({ children }) {
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 48, paddingBottom: 44, borderBottom: "1px solid rgba(255,255,255,.07)", marginBottom: 28 }} className="two-col">
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-              <div style={{ width: 34, height: 34, borderRadius: 9, background: "linear-gradient(135deg,#4F46E5,#0EA5E9)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 900 }}>N</div>
-              <span style={{ color: "white", fontWeight: 800, fontSize: "1rem" }}>Navya<span style={{ color: "#818CF8" }}>Tech</span> Solutions</span>
+              <div style={{ width: 34, height: 34, borderRadius: 9, background: "linear-gradient(135deg,#4F46E5,#0EA5E9)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 900 }}>C</div>
+              <span style={{ color: "white", fontWeight: 800, fontSize: "1rem" }}>Cheritech</span>
             </div>
             <p style={{ fontSize: "0.87rem", lineHeight: 1.85, color: "#64748B", maxWidth: 300 }}>
               Building practical digital products for businesses and customers. Based in Hyderabad, serving clients everywhere.
@@ -204,7 +204,7 @@ export default function CompanyLayout({ children }) {
           </div>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: "#334155", flexWrap: "wrap", gap: 10 }}>
-          <span>© 2026 Navya Tech Solutions. All rights reserved.</span>
+          <span>© 2026 Cheritech. All rights reserved.</span>
           <Link to="/privacy" style={{ color: "#818CF8", textDecoration: "none" }}>Privacy Policy</Link>
         </div>
       </footer>

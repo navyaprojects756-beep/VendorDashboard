@@ -84,7 +84,7 @@ export default function PrivacyPage() {
           <div className="anim-fadeInUp delay-1 anim-borderGlow" style={{ background: "#0D1610", borderRadius: 18, padding: "28px 32px", border: "1px solid rgba(0,200,150,0.15)", marginBottom: 32, position: "relative", overflow: "hidden" }}>
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg,#00C896,#06B6D4,#FFC542)" }} />
             <p style={{ color: "rgba(255,255,255,0.5)", fontSize: "0.97rem", lineHeight: 1.85, margin: 0 }}>
-              This Privacy Policy explains how <strong style={{ color: "white" }}>Navya Tech Solutions</strong> — a sole proprietorship by Vedullapalli Naga Durga Satya Sai Navya — collects and uses your information when you use our products and services. By using our services, you agree to this policy.
+              This Privacy Policy explains how <strong style={{ color: "white" }}>Cheritech</strong> — a sole proprietorship by Vedullapalli Naga Durga Satya Sai Navya — collects and uses your information when you use our products and services. By using our services, you agree to this policy.
             </p>
           </div>
 
