@@ -14,6 +14,7 @@ import Pauses    from "./dashboard/pages/Pauses"
 import HomePage from "./company/HomePage"
 import AboutPage from "./company/AboutPage"
 import PrivacyPage from "./company/PrivacyPage"
+import ProductDemo from "./company/ProductDemo"
 
 function VendorDashboard() {
   const [page,setPage]=useState("orders")
@@ -50,6 +51,7 @@ export default function App(){
       <Route path="/"        element={<HomePage />} />
       <Route path="/about"   element={<AboutPage />} />
       <Route path="/privacy" element={<PrivacyPage />} />
+      <Route path="/products" element={<ProductDemo />} />
       <Route path="/dashboard" element={<VendorDashboard />} />
       <Route path="*"        element={<Navigate to="/" replace />} />
     </Routes>

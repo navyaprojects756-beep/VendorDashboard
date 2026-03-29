@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom"
 
 const NAV = [
   { label: "Home",           path: "/" },
+  { label: "Products",       path: "/products" },
   { label: "About",          path: "/about" },
   { label: "Privacy Policy", path: "/privacy" },
 ]
