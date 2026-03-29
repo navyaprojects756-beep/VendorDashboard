@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react"
 import {
-  Box, Typography, Card, CardContent, Chip, IconButton,
-  Tooltip, CircularProgress, Skeleton, Divider, TextField,
-  InputAdornment, Alert
+  Box, Typography, Card, CardContent, Chip,
+  Skeleton, Divider, TextField, InputAdornment, Alert
 } from "@mui/material"
-import PlayArrowIcon  from "@mui/icons-material/PlayArrow"
 import PauseCircleIcon from "@mui/icons-material/PauseCircle"
 import SearchIcon     from "@mui/icons-material/Search"
 import EventIcon      from "@mui/icons-material/Event"
@@ -14,10 +12,12 @@ import AllInboxIcon   from "@mui/icons-material/AllInbox"
 import API, { getToken } from "../../services/api"
 import Toast from "../../components/Toast"
 
-function fmtDate(dateStr) {
-  if (!dateStr) return "—"
-  const d = new Date(String(dateStr).slice(0, 10) + "T00:00:00")
-  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+function fmtDate(val) {
+  if (!val) return "—"
+  // handles both ISO strings ("2026-04-02T00:00:00.000Z") and plain "YYYY-MM-DD"
+  const iso = String(val)
+  const [yr, mo, dy] = iso.slice(0, 10).split("-").map(Number)
+  return new Date(yr, mo - 1, dy).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
 }
 
 function daysRemaining(pause) {
@@ -40,10 +40,9 @@ function formatAddress(p) {
 }
 
 export default function Pauses({ dark }) {
-  const [pauses,   setPauses]   = useState([])
-  const [loading,  setLoading]  = useState(true)
-  const [resuming, setResuming] = useState(null)
-  const [search,   setSearch]   = useState("")
+  const [pauses,  setPauses]  = useState([])
+  const [loading, setLoading] = useState(true)
+  const [search,  setSearch]  = useState("")
   const [toast,    setToast]    = useState({ open: false, message: "", type: "success" })
 
   const token = getToken()
@@ -61,19 +60,6 @@ export default function Pauses({ dark }) {
   }
 
   useEffect(() => { load() }, [])
-
-  const handleResume = async (pause) => {
-    setResuming(pause.pause_id)
-    try {
-      await API.delete(`/pauses/${pause.pause_id}?token=${token}`)
-      setPauses(prev => prev.filter(p => p.pause_id !== pause.pause_id))
-      setToast({ open: true, message: `Resumed delivery for ${pause.phone}`, type: "success" })
-    } catch {
-      setToast({ open: true, message: "Failed to resume. Please try again.", type: "error" })
-    } finally {
-      setResuming(null)
-    }
-  }
 
   const filtered = pauses.filter(p =>
     p.phone?.includes(search) ||
@@ -135,9 +121,11 @@ export default function Pauses({ dark }) {
           value={search}
           onChange={e => setSearch(e.target.value)}
           fullWidth
-          InputProps={{
-            startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: subText }} /></InputAdornment>,
-            sx: { background: cardBg, borderRadius: 2, fontSize: 13 }
+          slotProps={{
+            input: {
+              startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: subText }} /></InputAdornment>,
+              sx: { background: cardBg, borderRadius: 2, fontSize: 13 }
+            }
           }}
           sx={{ "& .MuiOutlinedInput-root": { "& fieldset": { borderColor: border } } }}
         />
@@ -162,11 +150,10 @@ export default function Pauses({ dark }) {
       ) : (
         <Box display="flex" flexDirection="column" gap={1.5}>
           {filtered.map(pause => {
-            const days      = daysRemaining(pause)
-            const isManual  = !pause.pause_until
-            const isApt     = pause.address_type === "apartment"
-            const addr      = formatAddress(pause)
-            const resuming_ = resuming === pause.pause_id
+            const days     = daysRemaining(pause)
+            const isManual = !pause.pause_until
+            const isApt    = pause.address_type === "apartment"
+            const addr     = formatAddress(pause)
 
             return (
               <Card
@@ -221,35 +208,18 @@ export default function Pauses({ dark }) {
                         <Box>
                           <Typography fontSize={10} color={subText} fontWeight={600} letterSpacing="0.5px">RESUMES ON</Typography>
                           <Typography fontSize={12} fontWeight={600} color={dark ? "#e2e8f0" : "#374151"}>
-                            {pause.pause_until ? fmtDate(new Date(new Date(String(pause.pause_until).slice(0,10)+"T00:00:00").getTime() + 86400000)) : "Manual"}
+                            {pause.pause_until
+                              ? (() => {
+                                  const [yr, mo, dy] = pause.pause_until.slice(0,10).split("-").map(Number)
+                                  const next = new Date(yr, mo - 1, dy + 1)
+                                  return next.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                                })()
+                              : "Manual"
+                            }
                           </Typography>
                         </Box>
                       </Box>
                     </Box>
-
-                    {/* Right: resume button */}
-                    <Tooltip title="Resume delivery now">
-                      <span>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleResume(pause)}
-                          disabled={!!resuming}
-                          sx={{
-                            background: "#dcfce7",
-                            color:      "#16a34a",
-                            "&:hover":  { background: "#bbf7d0" },
-                            width: 36,
-                            height: 36,
-                            flexShrink: 0
-                          }}
-                        >
-                          {resuming_
-                            ? <CircularProgress size={16} color="inherit" />
-                            : <PlayArrowIcon fontSize="small" />
-                          }
-                        </IconButton>
-                      </span>
-                    </Tooltip>
 
                   </Box>
                 </CardContent>
