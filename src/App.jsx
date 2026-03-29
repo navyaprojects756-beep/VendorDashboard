@@ -1,6 +1,7 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Routes, Route, Navigate } from "react-router-dom"
 import { ThemeProvider, createTheme } from "@mui/material/styles"
+import { Snackbar, Alert } from "@mui/material"
 import Sidebar from "./dashboard/layout/Sidebar"
 import Header from "./dashboard/layout/Header"
 
@@ -16,10 +17,27 @@ import AboutPage from "./company/AboutPage"
 import PrivacyPage from "./company/PrivacyPage"
 import ProductDemo from "./company/ProductDemo"
 
+import API, { getToken } from "./services/api"
+
 function VendorDashboard() {
   const [page,setPage]=useState("orders")
   const [open,setOpen]=useState(false)
   const [dark,setDark]=useState(false)
+  const [waking, setWaking]=useState(false)
+
+  // Ping server on mount so Render wakes up before first real request
+  useEffect(() => {
+    let timer
+    const token = getToken()
+    if (!token) return
+    const controller = new AbortController()
+    setWaking(true)
+    timer = setTimeout(() => setWaking(false), 65000)
+    API.get(`/ping?token=${token}`, { signal: controller.signal })
+      .catch(() => {}) // ignore errors — this is just a wake-up call
+      .finally(() => { clearTimeout(timer); setWaking(false) })
+    return () => { controller.abort(); clearTimeout(timer) }
+  }, [])
 
   const theme = createTheme({
     palette:{ mode: dark ? "dark" : "light" }
@@ -41,6 +59,11 @@ function VendorDashboard() {
       <div style={{padding:"90px 20px 20px 20px"}}>
         {render()}
       </div>
+      <Snackbar open={waking} anchorOrigin={{ vertical:"bottom", horizontal:"center" }}>
+        <Alert severity="info" variant="filled" sx={{ width:"100%" }}>
+          Connecting to server, please wait...
+        </Alert>
+      </Snackbar>
     </ThemeProvider>
   )
 }
