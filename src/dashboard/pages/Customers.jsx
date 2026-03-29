@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react"
 import API, { getToken } from "../../services/api"
-import jsPDF from "jspdf"
-import autoTable from "jspdf-autotable"
+import Toast from "../../components/Toast"
 
 import {
   Box, Typography, Paper, Chip, TextField, Select, MenuItem,
@@ -24,7 +23,12 @@ import FileDownloadIcon   from "@mui/icons-material/FileDownload"
 import CloudDownloadIcon  from "@mui/icons-material/CloudDownload"
 
 /* ── date helpers ── */
-const toDateStr = (d) => d.toISOString().split("T")[0]
+const toDateStr = (d) => {
+  const y  = d.getFullYear()
+  const m  = String(d.getMonth() + 1).padStart(2, "0")
+  const dy = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${dy}`
+}
 const getWeekRange = () => {
   const now = new Date()
   const mon = new Date(now); mon.setDate(now.getDate() - ((now.getDay() + 6) % 7))
@@ -46,122 +50,6 @@ const getRange = (mode, cFrom, cTo) => {
 const fmtDate = (str) => {
   const d = new Date(str)
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
-}
-
-/* ── build invoice PDF (only delivered orders) ── */
-function buildPDF(data, from, to) {
-  const { customer, orders, price_per_unit, vendor } = data
-  const delivered = orders.filter((o) => o.is_delivered)
-  if (delivered.length === 0) return null
-
-  const doc       = new jsPDF()
-  const pageW     = doc.internal.pageSize.getWidth()
-  const rate      = Number(price_per_unit)
-  const totalQty  = delivered.reduce((s, o) => s + o.quantity, 0)
-  const totalAmt  = delivered.reduce((s, o) => s + o.quantity * rate, 0)
-  const invNo     = `INV-${from.replace(/-/g, "")}-${String(customer.phone).slice(-4)}`
-  const bizName   = vendor.business_name || "MilkRoute"
-  const bizAddr   = [vendor.area, vendor.city].filter(Boolean).join(", ")
-
-  doc.setFillColor(30, 64, 175)
-  doc.rect(0, 0, pageW, 38, "F")
-  doc.setFillColor(37, 99, 235)
-  doc.rect(0, 30, pageW, 8, "F")
-
-  doc.setTextColor(255, 255, 255)
-  doc.setFontSize(20); doc.setFont("helvetica", "bold")
-  doc.text("MILK INVOICE", 14, 15)
-  doc.setFontSize(9.5); doc.setFont("helvetica", "normal")
-  doc.text(bizName, pageW - 14, 11, { align: "right" })
-  if (bizAddr) doc.text(bizAddr, pageW - 14, 18, { align: "right" })
-  if (vendor.whatsapp_number) doc.text(`Ph: ${vendor.whatsapp_number}`, pageW - 14, 25, { align: "right" })
-
-  doc.setFontSize(8.5)
-  doc.text(`Invoice No: ${invNo}`, 14, 36)
-  doc.text(`Generated: ${toDateStr(new Date())}`, pageW - 14, 36, { align: "right" })
-
-  doc.setTextColor(30, 30, 30)
-  const boxTop = 44
-  doc.setFillColor(247, 248, 250)
-  doc.roundedRect(14, boxTop, 88, 30, 2, 2, "F")
-  doc.setFontSize(8); doc.setFont("helvetica", "bold"); doc.setTextColor(100, 100, 100)
-  doc.text("BILL TO", 19, boxTop + 7)
-  doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.setTextColor(20, 20, 20)
-  doc.text(String(customer.phone), 19, boxTop + 14)
-  if (customer.address) {
-    doc.setFontSize(8.5); doc.setFont("helvetica", "normal"); doc.setTextColor(80, 80, 80)
-    doc.text(customer.address, 19, boxTop + 21, { maxWidth: 78 })
-  }
-
-  doc.setFillColor(239, 246, 255)
-  doc.roundedRect(108, boxTop, 88, 30, 2, 2, "F")
-  doc.setFontSize(8); doc.setFont("helvetica", "bold"); doc.setTextColor(100, 100, 100)
-  doc.text("BILLING PERIOD", 113, boxTop + 7)
-  doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.setTextColor(30, 64, 175)
-  doc.text(fmtDate(from), 113, boxTop + 15)
-  doc.setFontSize(8.5); doc.setFont("helvetica", "normal"); doc.setTextColor(80, 80, 80)
-  doc.text("to", 113, boxTop + 21)
-  doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.setTextColor(30, 64, 175)
-  doc.text(fmtDate(to), 113, boxTop + 28)
-
-  autoTable(doc, {
-    startY: boxTop + 36,
-    head: [["#", "Delivery Date", "Packets", "Rate / Packet", "Amount"]],
-    body: delivered.map((o, i) => [
-      i + 1,
-      fmtDate(String(o.order_date).slice(0, 10)),
-      o.quantity,
-      `Rs. ${rate.toFixed(2)}`,
-      `Rs. ${(o.quantity * rate).toFixed(2)}`,
-    ]),
-    headStyles: {
-      fillColor: [30, 64, 175], textColor: [255, 255, 255],
-      fontStyle: "bold", fontSize: 9.5, cellPadding: 4,
-    },
-    bodyStyles: { fontSize: 9.5, cellPadding: 3.5 },
-    alternateRowStyles: { fillColor: [248, 250, 255] },
-    columnStyles: {
-      0: { cellWidth: 10, halign: "center" },
-      2: { halign: "center" },
-      3: { halign: "right" },
-      4: { halign: "right", fontStyle: "bold" },
-    },
-    styles: { overflow: "linebreak" },
-  })
-
-  const finalY = doc.lastAutoTable.finalY
-
-  doc.setFillColor(30, 64, 175)
-  doc.rect(14, finalY + 4, pageW - 28, 0.4, "F")
-
-  const tBox = finalY + 8
-  doc.setFillColor(239, 246, 255)
-  doc.roundedRect(pageW - 80, tBox, 66, 28, 2, 2, "F")
-  doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(80, 80, 80)
-  doc.text("Total Packets Delivered:", pageW - 76, tBox + 8)
-  doc.text("Rate per Packet:", pageW - 76, tBox + 16)
-  doc.setFontSize(11); doc.setFont("helvetica", "bold"); doc.setTextColor(30, 64, 175)
-  doc.text("Total Amount:", pageW - 76, tBox + 26)
-
-  doc.setFontSize(9); doc.setFont("helvetica", "bold"); doc.setTextColor(20, 20, 20)
-  doc.text(String(totalQty), pageW - 18, tBox + 8, { align: "right" })
-  doc.text(`Rs. ${rate.toFixed(2)}`, pageW - 18, tBox + 16, { align: "right" })
-  doc.setFontSize(11.5); doc.setTextColor(30, 64, 175)
-  doc.text(`Rs. ${totalAmt.toFixed(2)}`, pageW - 18, tBox + 26, { align: "right" })
-
-  doc.setFontSize(8.5); doc.setFont("helvetica", "italic"); doc.setTextColor(120, 120, 120)
-  doc.text("Thank you for your continued support!", 14, tBox + 12)
-  doc.text("* This invoice covers only delivered milk packets for the stated period.", 14, tBox + 19)
-
-  const footerY = 283
-  doc.setFillColor(30, 64, 175)
-  doc.rect(0, footerY - 2, pageW, 0.3, "F")
-  doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(140, 140, 140)
-  doc.text(bizName, 14, footerY + 4)
-  doc.text("Generated by MilkRoute Vendor Dashboard", pageW / 2, footerY + 4, { align: "center" })
-  doc.text(`Invoice: ${invNo}`, pageW - 14, footerY + 4, { align: "right" })
-
-  return doc
 }
 
 /* ═══════════════════════════════════════════
@@ -205,6 +93,7 @@ export default function Customers({ dark }) {
 
   /* per-customer download */
   const [downloadingCustomer, setDownloadingCustomer] = useState(null)
+  const [toast, setToast] = useState({ open: false, message: "", type: "success" })
 
   /* theme */
   const border        = dark ? "#1e293b" : "#e5e7eb"
@@ -256,42 +145,47 @@ export default function Customers({ dark }) {
     fetchInvoice(customer.customer_id)
   }
 
+  /* ── shared: download PDF from backend ── */
+  const downloadPDFFromBackend = async (customerId, phone, from, to) => {
+    const url = `${import.meta.env.VITE_API_BASE_URL}/customers/${customerId}/invoice/pdf?token=${getToken()}&from=${from}&to=${to}`
+    const res = await fetch(url)
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.error || "Download failed")
+    }
+    const blob   = await res.blob()
+    const link   = document.createElement("a")
+    link.href    = URL.createObjectURL(blob)
+    link.download = `bill_${phone}_${from}_${to}.pdf`
+    link.click()
+    URL.revokeObjectURL(link.href)
+  }
+
   /* ── download single PDF from dialog ── */
-  const downloadSinglePDF = () => {
+  const downloadSinglePDF = async () => {
     if (!invoiceData) return
     const { from, to } = getRange(dateMode, fromDate, toDate)
-    const deliveredOnly = { ...invoiceData, orders: invoiceData.orders.filter((o) => o.is_delivered) }
-    const doc = buildPDF(deliveredOnly, from, to)
-    if (!doc) return
-    doc.save(`invoice_${invoiceData.customer.phone}_${from}_${to}.pdf`)
+    try {
+      await downloadPDFFromBackend(invoiceData.customer.customer_id, invoiceData.customer.phone, from, to)
+    } catch (err) {
+      setToast({ open: true, message: err.message, type: "error" })
+    }
   }
 
   /* ── per-customer download icon ── */
   const downloadCustomerInvoice = async (customer) => {
     const { from, to } = generatedPeriod || getRange(dateMode, fromDate, toDate)
-
-    /* use pre-generated data if available */
-    if (generatedData.has(customer.customer_id) && generatedPeriod) {
-      const data = generatedData.get(customer.customer_id)
-      const doc  = buildPDF(data, generatedPeriod.from, generatedPeriod.to)
-      if (doc) doc.save(`invoice_${customer.phone}_${generatedPeriod.from}_${generatedPeriod.to}.pdf`)
-      return
-    }
-
-    /* fetch on demand */
     setDownloadingCustomer(customer.customer_id)
     try {
-      const { from: f, to: t } = getRange(dateMode, fromDate, toDate)
-      const r = await API.get(`/customers/${customer.customer_id}/invoice?token=${getToken()}&from=${f}&to=${t}`)
-      const deliveredOnly = { ...r.data, orders: r.data.orders.filter((o) => o.is_delivered) }
-      const doc = buildPDF(deliveredOnly, f, t)
-      if (doc) doc.save(`invoice_${customer.phone}_${f}_${t}.pdf`)
+      await downloadPDFFromBackend(customer.customer_id, customer.phone, from, to)
+    } catch (err) {
+      setToast({ open: true, message: err.message, type: "error" })
     } finally {
       setDownloadingCustomer(null)
     }
   }
 
-  /* ── GENERATE all: fetch & store, no download ── */
+  /* ── GENERATE all: check who has deliveries in period ── */
   const generateAllInvoices = async () => {
     setBulkRunning(true)
     setBulkDone(0); setBulkSkipped(0); setBulkTotal(filtered.length)
@@ -307,9 +201,9 @@ export default function Customers({ dark }) {
       const c = filtered[i]
       try {
         const r = await API.get(`/customers/${c.customer_id}/invoice?token=${getToken()}&from=${from}&to=${to}`)
-        const deliveredOrders = r.data.orders.filter((o) => o.is_delivered)
-        if (deliveredOrders.length > 0) {
-          newMap.set(c.customer_id, { ...r.data, orders: deliveredOrders })
+        const hasDeliveries = r.data.orders.some((o) => o.is_delivered)
+        if (hasDeliveries) {
+          newMap.set(c.customer_id, { phone: c.phone })  // just track who is ready
         } else {
           skipped++
         }
@@ -324,7 +218,7 @@ export default function Customers({ dark }) {
     setBulkRunning(false)
   }
 
-  /* ── DOWNLOAD all: use stored data ── */
+  /* ── DOWNLOAD all: fetch PDF from backend per customer ── */
   const downloadAllInvoices = async () => {
     if (!generatedPeriod || generatedData.size === 0) return
     setDownloadingAll(true)
@@ -335,12 +229,11 @@ export default function Customers({ dark }) {
     const { from, to } = generatedPeriod
 
     for (let i = 0; i < entries.length; i++) {
-      const [, data] = entries[i]
-      const doc = buildPDF(data, from, to)
-      if (doc) {
-        doc.save(`invoice_${data.customer.phone}_${from}_${to}.pdf`)
-        await new Promise((res) => setTimeout(res, 700))
-      }
+      const [customerId, { phone }] = entries[i]
+      try {
+        await downloadPDFFromBackend(customerId, phone, from, to)
+        await new Promise((r) => setTimeout(r, 700))
+      } catch { /* skip failed */ }
       setDlDone(i + 1)
     }
 
@@ -369,7 +262,7 @@ export default function Customers({ dark }) {
         </Box>
         <Box>
           <Typography fontWeight={700} fontSize={17} color={textPrimary} lineHeight={1.2}>Customers</Typography>
-          <Typography fontSize={12} color={textSecondary}>View customers and generate invoices</Typography>
+          <Typography fontSize={12} color={textSecondary}>View customers and generate bills</Typography>
         </Box>
       </Box>
 
@@ -389,7 +282,7 @@ export default function Customers({ dark }) {
 
       {/* ── Period + Bulk Invoice ── */}
       <Paper elevation={0} sx={{ p: 2, mb: 2, borderRadius: 3, border: `1px solid ${border}`, background: bg }}>
-        <Typography fontWeight={700} fontSize={13} color={textPrimary} mb={1.5}>Invoice Period</Typography>
+        <Typography fontWeight={700} fontSize={13} color={textPrimary} mb={1.5}>Bill Period</Typography>
 
         <Box display="flex" alignItems="center" gap={1} flexWrap="wrap" mb={1.5}>
           <ToggleButtonGroup size="small" exclusive value={dateMode}
@@ -427,7 +320,7 @@ export default function Customers({ dark }) {
         {bulkRunning && (
           <Box mb={1.5}>
             <Typography fontSize={12} color={textSecondary} mb={0.5}>
-              Fetching invoices… {bulkDone} / {bulkTotal}
+              Fetching bills… {bulkDone} / {bulkTotal}
               {bulkSkipped > 0 && ` (${bulkSkipped} skipped — no deliveries)`}
             </Typography>
             <LinearProgress variant="determinate" value={(bulkDone / bulkTotal) * 100}
@@ -440,7 +333,7 @@ export default function Customers({ dark }) {
           <Box sx={{ px: 1.5, py: 0.8, borderRadius: 2, background: dark ? "#1e3a5f" : "#eff6ff", border: `1px solid ${dark ? "#1d4ed8" : "#bfdbfe"}`, mb: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
             <CheckCircleIcon sx={{ fontSize: 15, color: "#2563eb" }} />
             <Typography fontSize={12} color="#2563eb" fontWeight={600}>
-              {readyCount} invoice{readyCount !== 1 ? "s" : ""} ready
+              {readyCount} bill{readyCount !== 1 ? "s" : ""} ready
               {bulkSkipped > 0 ? ` · ${bulkSkipped} skipped (no deliveries)` : ""}
             </Typography>
           </Box>
@@ -462,7 +355,7 @@ export default function Customers({ dark }) {
           <Box sx={{ px: 1.5, py: 0.8, borderRadius: 2, background: dark ? "#14532d" : "#f0fdf4", border: `1px solid ${dark ? "#166534" : "#bbf7d0"}`, mb: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
             <CheckCircleIcon sx={{ fontSize: 15, color: "#16a34a" }} />
             <Typography fontSize={12} color="#16a34a" fontWeight={600}>
-              All {dlTotal} invoice{dlTotal !== 1 ? "s" : ""} downloaded successfully.
+              All {dlTotal} bill{dlTotal !== 1 ? "s" : ""} downloaded successfully.
             </Typography>
           </Box>
         )}
@@ -474,7 +367,7 @@ export default function Customers({ dark }) {
             disabled={bulkRunning || downloadingAll || filtered.length === 0}
             onClick={generateAllInvoices}
             sx={{ textTransform: "none", fontWeight: 700, fontSize: 13, borderRadius: "8px", background: "#2563eb", "&:hover": { background: "#1d4ed8" } }}>
-            {bulkRunning ? `Fetching ${bulkDone}/${bulkTotal}…` : `Generate All Invoices (${filtered.length})`}
+            {bulkRunning ? `Fetching ${bulkDone}/${bulkTotal}…` : `Generate All Bills (${filtered.length})`}
           </Button>
 
           {readyCount > 0 && !bulkRunning && (
@@ -483,7 +376,7 @@ export default function Customers({ dark }) {
               disabled={downloadingAll}
               onClick={downloadAllInvoices}
               sx={{ textTransform: "none", fontWeight: 700, fontSize: 13, borderRadius: "8px", background: "#7c3aed", "&:hover": { background: "#6d28d9" } }}>
-              {downloadingAll ? `Downloading ${dlDone}/${dlTotal}…` : `Download All Invoices (${readyCount})`}
+              {downloadingAll ? `Downloading ${dlDone}/${dlTotal}…` : `Download All Bills (${readyCount})`}
             </Button>
           )}
         </Box>
@@ -571,7 +464,7 @@ export default function Customers({ dark }) {
                   )}
                   <Box display="flex" alignItems="center" gap={0.5}>
                     {/* Per-customer download icon */}
-                    <Tooltip title={isGenerated ? "Download invoice (ready)" : "Download invoice"} arrow>
+                    <Tooltip title={isGenerated ? "Download bill (ready)" : "Download bill"} arrow>
                       <span>
                         <IconButton size="small"
                           onClick={() => downloadCustomerInvoice(c)}
@@ -596,7 +489,7 @@ export default function Customers({ dark }) {
                     <Button size="small" variant="outlined" startIcon={<ReceiptLongIcon sx={{ fontSize: "14px !important" }} />}
                       onClick={() => openInvoice(c)}
                       sx={{ textTransform: "none", fontWeight: 600, fontSize: 11.5, borderRadius: "7px", borderColor: "#7c3aed", color: "#7c3aed", py: 0.4, "&:hover": { background: dark ? "#2e1065" : "#faf5ff" } }}>
-                      Invoice
+                      Bill
                     </Button>
                   </Box>
                 </Box>
@@ -614,7 +507,7 @@ export default function Customers({ dark }) {
         <DialogTitle sx={{ pb: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <Box>
             <Typography fontWeight={700} fontSize={15} color={textPrimary}>
-              Invoice — {selCustomer?.phone}
+              Bill — {selCustomer?.phone}
             </Typography>
             {selCustomer?.address && (
               <Typography fontSize={11.5} color={textSecondary}>{selCustomer.address}</Typography>
@@ -710,10 +603,17 @@ export default function Customers({ dark }) {
             disabled={!invoiceData || invLoading || invoiceData?.orders?.filter((o) => o.is_delivered).length === 0}
             onClick={downloadSinglePDF}
             sx={{ textTransform: "none", fontWeight: 700, borderRadius: "8px", background: "#7c3aed", "&:hover": { background: "#6d28d9" } }}>
-            Download Invoice PDF
+            Download Bill PDF
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Toast
+        open={toast.open}
+        setOpen={(v) => setToast(t => ({ ...t, open: v }))}
+        message={toast.message}
+        type={toast.type}
+      />
 
     </Box>
   )
