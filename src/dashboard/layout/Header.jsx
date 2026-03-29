@@ -1,12 +1,10 @@
 import { AppBar, Toolbar, Typography, IconButton, Box, Avatar } from "@mui/material"
 import MenuIcon from "@mui/icons-material/Menu"
-import DarkModeIcon from "@mui/icons-material/DarkMode"
-import LightModeIcon from "@mui/icons-material/LightMode"
 import LocalDrinkIcon from "@mui/icons-material/LocalDrink"
 import API, { getToken } from "../../services/api"
 import { useState, useEffect } from "react"
 
-export default function Header({ setOpen, dark, setDark }) {
+export default function Header({ setOpen, dark }) {
   const [profile, setProfile] = useState({})
 
   useEffect(() => {
@@ -91,19 +89,6 @@ export default function Header({ setOpen, dark, setDark }) {
         {/* Right actions */}
         <Box display="flex" alignItems="center" gap={0.5}>
 
-          <IconButton
-            size="small"
-            onClick={() => setDark((p) => !p)}
-            title={dark ? "Light mode" : "Dark mode"}
-            sx={{
-              color: dark ? "#94a3b8" : "#6b7280",
-              "&:hover": { background: dark ? "#1e293b" : "#f3f4f6" },
-            }}
-          >
-            {dark ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
-          </IconButton>
-
-
           <Avatar
             sx={{
               width: 30,
@@ -114,7 +99,7 @@ export default function Header({ setOpen, dark, setDark }) {
               ml: 0.5,
             }}
           >
-            {(profile.business_name?.[0] || "V").toUpperCase()}
+            {(profile.business_name?.[0] || "").toUpperCase()}
           </Avatar>
 
         </Box>

@@ -9,6 +9,7 @@ import Apartments from "./dashboard/pages/Apartments"
 import Blocks from "./dashboard/pages/Blocks"
 import Settings from "./dashboard/pages/Settings"
 import Customers from "./dashboard/pages/Customers"
+import Pauses    from "./dashboard/pages/Pauses"
 
 import HomePage from "./company/HomePage"
 import AboutPage from "./company/AboutPage"
@@ -29,6 +30,7 @@ function VendorDashboard() {
     if(page==="blocks") return <Blocks dark={dark}/>
     if(page==="settings") return <Settings dark={dark}/>
     if(page==="customers") return <Customers dark={dark}/>
+    if(page==="pauses")    return <Pauses dark={dark}/>
   }
 
   return (
