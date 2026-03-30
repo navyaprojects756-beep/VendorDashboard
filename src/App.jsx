@@ -7,7 +7,6 @@ import Header from "./dashboard/layout/Header"
 
 import Orders from "./dashboard/pages/Orders"
 import Apartments from "./dashboard/pages/Apartments"
-import Blocks from "./dashboard/pages/Blocks"
 import Settings from "./dashboard/pages/Settings"
 import Customers from "./dashboard/pages/Customers"
 import Pauses    from "./dashboard/pages/Pauses"
@@ -17,13 +16,14 @@ import AboutPage from "./company/AboutPage"
 import PrivacyPage from "./company/PrivacyPage"
 import ProductDemo from "./company/ProductDemo"
 
-import API, { getToken } from "./services/api"
+import API, { getToken, getRole } from "./services/api"
 
 function VendorDashboard() {
   const [page,setPage]=useState("orders")
   const [open,setOpen]=useState(false)
   const [dark,setDark]=useState(false)
   const [waking, setWaking]=useState(false)
+  const role = getRole()
 
   // Ping server on mount so Render wakes up before first real request
   useEffect(() => {
@@ -45,16 +45,19 @@ function VendorDashboard() {
 
   const render=()=>{
     if(page==="orders") return <Orders dark={dark}/>
-    if(page==="apartments") return <Apartments dark={dark}/>
-    if(page==="blocks") return <Blocks dark={dark}/>
-    if(page==="settings") return <Settings dark={dark}/>
-    if(page==="customers") return <Customers dark={dark}/>
-    if(page==="pauses")    return <Pauses dark={dark}/>
+    if(role==="admin"){
+      if(page==="apartments") return <Apartments dark={dark}/>
+      if(page==="settings")   return <Settings dark={dark}/>
+      if(page==="customers")  return <Customers dark={dark}/>
+      if(page==="pauses")     return <Pauses dark={dark}/>
+    }
+    // delivery role falls back to orders for any other page
+    return <Orders dark={dark}/>
   }
 
   return (
     <ThemeProvider theme={theme}>
-      <Sidebar open={open} setOpen={setOpen} setPage={setPage} dark={dark}/>
+      <Sidebar open={open} setOpen={setOpen} setPage={setPage} dark={dark} role={role}/>
       <Header setOpen={setOpen} setDark={setDark} dark={dark}/>
       <div style={{padding:"90px 20px 20px 20px"}}>
         {render()}

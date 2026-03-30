@@ -5,23 +5,22 @@ import {
 
 import DashboardIcon     from "@mui/icons-material/Dashboard"
 import ApartmentIcon     from "@mui/icons-material/Apartment"
-import GridViewIcon      from "@mui/icons-material/GridView"
 import SettingsIcon      from "@mui/icons-material/Settings"
 import LocalDrinkIcon    from "@mui/icons-material/LocalDrink"
 import ChevronRightIcon  from "@mui/icons-material/ChevronRight"
 import PeopleIcon        from "@mui/icons-material/People"
 import PauseCircleIcon   from "@mui/icons-material/PauseCircle"
 
-const MENU = [
-  { key: "orders",     label: "Orders",     icon: <DashboardIcon fontSize="small" />   },
-  { key: "customers",  label: "Customers",  icon: <PeopleIcon fontSize="small" />      },
-  { key: "pauses",     label: "Pauses",     icon: <PauseCircleIcon fontSize="small" /> },
-  { key: "apartments", label: "Apartments", icon: <ApartmentIcon fontSize="small" />   },
-  { key: "blocks",     label: "Blocks",     icon: <GridViewIcon fontSize="small" />    },
-  { key: "settings",   label: "Settings",   icon: <SettingsIcon fontSize="small" />    },
+const ALL_MENU = [
+  { key: "orders",     label: "Orders",            icon: <DashboardIcon fontSize="small" />,  roles: ["admin","delivery"] },
+  { key: "customers",  label: "Customers",         icon: <PeopleIcon fontSize="small" />,     roles: ["admin"] },
+  { key: "pauses",     label: "Pauses",            icon: <PauseCircleIcon fontSize="small" />,roles: ["admin"] },
+  { key: "apartments", label: "Apartments & Blocks",icon: <ApartmentIcon fontSize="small" />, roles: ["admin"] },
+  { key: "settings",   label: "Settings",          icon: <SettingsIcon fontSize="small" />,   roles: ["admin"] },
 ]
 
-export default function Sidebar({ open, setOpen, page, setPage, dark }) {
+export default function Sidebar({ open, setOpen, page, setPage, dark, role = "admin" }) {
+  const MENU = ALL_MENU.filter((m) => m.roles.includes(role))
   return (
     <Drawer
       open={open}
@@ -140,6 +139,22 @@ export default function Sidebar({ open, setOpen, page, setPage, dark }) {
         py={1.5}
         sx={{ borderTop: `1px solid ${dark ? "#1e293b" : "#f3f4f6"}` }}
       >
+        {role === "delivery" && (
+          <Box
+            sx={{
+              mb: 1, px: 1.2, py: 0.8, borderRadius: "8px",
+              background: dark ? "#1c1000" : "#fff7ed",
+              border: `1px solid ${dark ? "#78350f" : "#fed7aa"}`,
+            }}
+          >
+            <Typography fontSize={11} fontWeight={700} color="#ea580c">
+              🚚 Delivery Mode
+            </Typography>
+            <Typography fontSize={10} color={dark ? "#a16207" : "#92400e"}>
+              Orders view only
+            </Typography>
+          </Box>
+        )}
         <Typography fontSize={11} color={dark ? "#475569" : "#9ca3af"}>
           © 2026 MilkRoute
         </Typography>

@@ -38,4 +38,16 @@ API.interceptors.response.use(
 export const getToken = () =>
   new URLSearchParams(window.location.search).get("token")
 
+// Decode JWT payload (no verification — just reads role from URL token)
+export const getRole = () => {
+  try {
+    const token = getToken()
+    if (!token) return "admin"
+    const payload = JSON.parse(atob(token.split(".")[1]))
+    return payload.role || "admin"
+  } catch {
+    return "admin"
+  }
+}
+
 export default API
