@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import API, { getToken } from "../../services/api"
+import API, { getToken, getRole } from "../../services/api"
 
 import {
   Box,
@@ -51,6 +51,7 @@ const isSameDay = (orderDate, targetStr) => {
 /* ─────────────────────────────────────── */
 
 export default function Orders({ dark }) {
+  const isAdmin = getRole() === "admin"
   const [orders,     setOrders]     = useState([])
   const [filtered,   setFiltered]   = useState([])
   const [generating, setGenerating] = useState(false)
@@ -192,28 +193,30 @@ export default function Orders({ dark }) {
       {/* ══ PAGE HEADER ══ */}
       <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
         <Typography fontWeight={700} fontSize={17}>Orders</Typography>
-        <Button
-          variant="contained"
-          size="small"
-          onClick={generate}
-          disabled={generating}
-          startIcon={
-            <AutorenewIcon
-              fontSize="small"
-              sx={{
-                animation: generating ? "spin 1s linear infinite" : "none",
-                "@keyframes spin": { "0%": { transform: "rotate(0deg)" }, "100%": { transform: "rotate(360deg)" } },
-              }}
-            />
-          }
-          sx={{
-            textTransform: "none", fontWeight: 600, fontSize: 13, borderRadius: "8px",
-            background: "#2563eb", "&:hover": { background: "#1d4ed8" },
-            "&.Mui-disabled": { background: "#93c5fd", color: "white" },
-          }}
-        >
-          {generating ? "Generating…" : "Generate Today's Orders"}
-        </Button>
+        {isAdmin && (
+          <Button
+            variant="contained"
+            size="small"
+            onClick={generate}
+            disabled={generating}
+            startIcon={
+              <AutorenewIcon
+                fontSize="small"
+                sx={{
+                  animation: generating ? "spin 1s linear infinite" : "none",
+                  "@keyframes spin": { "0%": { transform: "rotate(0deg)" }, "100%": { transform: "rotate(360deg)" } },
+                }}
+              />
+            }
+            sx={{
+              textTransform: "none", fontWeight: 600, fontSize: 13, borderRadius: "8px",
+              background: "#2563eb", "&:hover": { background: "#1d4ed8" },
+              "&.Mui-disabled": { background: "#93c5fd", color: "white" },
+            }}
+          >
+            {generating ? "Generating…" : "Generate Today's Orders"}
+          </Button>
+        )}
       </Box>
 
       {/* ══ DATE FILTER ══ */}
