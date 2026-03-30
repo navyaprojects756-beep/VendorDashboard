@@ -279,7 +279,7 @@ export default function Settings({ dark }) {
           </Section>
 
           {/* WhatsApp Share Link */}
-          {p.whatsapp_number && (
+          {(p.whatsapp_api_number || p.whatsapp_number) && (
             <Section title="WhatsApp Share Link" icon={<ShareIcon fontSize="small" />} color="#16a34a" dark={dark}>
               <Box sx={{ px: 2.5, py: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
                 <Typography fontSize={12} color={textSecondary} lineHeight={1.5}>
@@ -293,11 +293,11 @@ export default function Settings({ dark }) {
                 }}>
                   <WhatsAppIcon sx={{ fontSize: 18, color: "#16a34a", flexShrink: 0 }} />
                   <Typography fontSize={12.5} fontWeight={500} color={dark ? "#86efac" : "#15803d"} sx={{ flex: 1, wordBreak: "break-all" }}>
-                    {`https://wa.me/${p.whatsapp_number}?text=Hi`}
+                    {`https://wa.me/${p.whatsapp_api_number || p.whatsapp_number}?text=Hi`}
                   </Typography>
                   <Tooltip title={linkCopied ? "Copied!" : "Copy link"} placement="top">
                     <IconButton size="small" onClick={() => {
-                      navigator.clipboard.writeText(`https://wa.me/${p.whatsapp_number}?text=Hi`)
+                      navigator.clipboard.writeText(`https://wa.me/${p.whatsapp_api_number || p.whatsapp_number}?text=Hi`)
                       setLinkCopied(true)
                       setTimeout(() => setLinkCopied(false), 2000)
                     }}>
