@@ -17,7 +17,6 @@ import LocationOnIcon   from "@mui/icons-material/LocationOn"
 import HomeWorkIcon     from "@mui/icons-material/HomeWork"
 import ExpandMoreIcon   from "@mui/icons-material/ExpandMore"
 import GridViewIcon     from "@mui/icons-material/GridView"
-import DeleteIcon       from "@mui/icons-material/Delete"
 
 export default function Apartments({ dark }) {
   const [data,    setData]    = useState([])
@@ -101,13 +100,6 @@ export default function Apartments({ dark }) {
     load()
   }
 
-  const deleteApartment = async (id) => {
-    if (!window.confirm("Delete this apartment and all its blocks?")) return
-    await API.delete(`/apartments/${id}?token=${getToken()}`)
-    setExpanded((p) => { const n = new Set(p); n.delete(id); return n })
-    setBlocksMap((p) => { const n = { ...p }; delete n[id]; return n })
-    load()
-  }
 
   /* ── BLOCK CRUD ── */
   const addBlock = async (aptId) => {
@@ -130,11 +122,6 @@ export default function Apartments({ dark }) {
     loadBlocks(aptId)
   }
 
-  const deleteBlock = async (blockId, aptId) => {
-    if (!window.confirm("Delete this block?")) return
-    await API.delete(`/blocks/${blockId}?token=${getToken()}`)
-    loadBlocks(aptId)
-  }
 
   /* ── FILTER ── */
   const filtered = data.filter(
@@ -359,17 +346,6 @@ export default function Apartments({ dark }) {
 
                   {/* RIGHT */}
                   <Box display="flex" alignItems="center" gap={0.5} flexShrink={0} onClick={(e) => e.stopPropagation()}>
-                    <Chip
-                      label={a.is_active ? "Active" : "Inactive"}
-                      size="small"
-                      sx={{
-                        fontSize: 11, fontWeight: 600,
-                        background: a.is_active
-                          ? dark ? "#14532d" : "#dcfce7"
-                          : dark ? "#1e293b" : "#f3f4f6",
-                        color: a.is_active ? "#16a34a" : textSecondary,
-                      }}
-                    />
                     <Switch
                       size="small" checked={!!a.is_active}
                       onChange={() => toggleApartment(a.apartment_id)}
@@ -383,13 +359,6 @@ export default function Apartments({ dark }) {
                         onClick={() => { setEditId(a.apartment_id); setEditName(a.name); setEditAddress(a.address || "") }}
                         sx={{ color: textSecondary, "&:hover": { color: "#2563eb" } }}>
                         <EditIcon sx={{ fontSize: 15 }} />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Delete">
-                      <IconButton size="small"
-                        onClick={() => deleteApartment(a.apartment_id)}
-                        sx={{ color: textSecondary, "&:hover": { color: "#dc2626" } }}>
-                        <DeleteIcon sx={{ fontSize: 15 }} />
                       </IconButton>
                     </Tooltip>
                     <IconButton size="small" onClick={() => toggleExpand(a.apartment_id)}
@@ -407,6 +376,46 @@ export default function Apartments({ dark }) {
               {/* ── BLOCKS PANEL ── */}
               <Collapse in={isExpanded} unmountOnExit>
                 <Box sx={{ background: bgBlock, borderTop: `1px solid ${border}`, px: 3, py: 2 }}>
+
+                  {/* Apartment detail banner */}
+                  <Box sx={{
+                    mb: 2, px: 1.5, py: 1.2, borderRadius: 2,
+                    background: dark ? "#0f172a" : "#fff",
+                    border: `1px solid ${border}`,
+                    display: "flex", alignItems: "center", gap: 1.5,
+                  }}>
+                    <Box sx={{
+                      width: 32, height: 32, borderRadius: "8px", flexShrink: 0,
+                      background: a.is_active ? dark ? "#14532d" : "#dcfce7" : dark ? "#1e293b" : "#f3f4f6",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <ApartmentIcon sx={{ fontSize: 16, color: a.is_active ? "#16a34a" : textSecondary }} />
+                    </Box>
+                    <Box minWidth={0} flex={1}>
+                      <Typography fontWeight={700} fontSize={14} color={textPrimary} sx={{ wordBreak: "break-word" }}>
+                        {a.name}
+                      </Typography>
+                      {a.address ? (
+                        <Box display="flex" alignItems="flex-start" gap={0.4} mt={0.2}>
+                          <LocationOnIcon sx={{ fontSize: 12, color: textSecondary, mt: "2px", flexShrink: 0 }} />
+                          <Typography fontSize={12} color={textSecondary} sx={{ wordBreak: "break-word" }}>
+                            {a.address}
+                          </Typography>
+                        </Box>
+                      ) : (
+                        <Typography fontSize={11} color={textSecondary} sx={{ opacity: 0.6 }}>No address set</Typography>
+                      )}
+                    </Box>
+                    <Chip
+                      label={a.is_active ? "Active" : "Inactive"}
+                      size="small"
+                      sx={{
+                        flexShrink: 0, fontSize: 11, fontWeight: 600,
+                        background: a.is_active ? dark ? "#14532d" : "#dcfce7" : dark ? "#1e293b" : "#f3f4f6",
+                        color: a.is_active ? "#16a34a" : textSecondary,
+                      }}
+                    />
+                  </Box>
 
                   {/* Blocks header */}
                   <Box display="flex" alignItems="center" justifyContent="space-between" mb={1.5}>
@@ -516,17 +525,6 @@ export default function Apartments({ dark }) {
                             </Typography>
                           </Box>
                           <Box display="flex" alignItems="center" gap={0.5}>
-                            <Chip
-                              label={b.is_active ? "Active" : "Inactive"}
-                              size="small"
-                              sx={{
-                                height: 18, fontSize: 10, fontWeight: 600,
-                                background: b.is_active
-                                  ? dark ? "#2e1065" : "#ede9fe"
-                                  : dark ? "#1e293b" : "#f3f4f6",
-                                color: b.is_active ? "#7c3aed" : textSecondary,
-                              }}
-                            />
                             <Switch
                               size="small" checked={!!b.is_active}
                               onChange={() => toggleBlock(b.block_id, a.apartment_id)}
@@ -540,13 +538,6 @@ export default function Apartments({ dark }) {
                                 onClick={() => { setEditBlockId(b.block_id); setEditBlockName(b.block_name) }}
                                 sx={{ color: textSecondary, "&:hover": { color: "#7c3aed" } }}>
                                 <EditIcon sx={{ fontSize: 13 }} />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Delete">
-                              <IconButton size="small"
-                                onClick={() => deleteBlock(b.block_id, a.apartment_id)}
-                                sx={{ color: textSecondary, "&:hover": { color: "#dc2626" } }}>
-                                <DeleteIcon sx={{ fontSize: 13 }} />
                               </IconButton>
                             </Tooltip>
                           </Box>
