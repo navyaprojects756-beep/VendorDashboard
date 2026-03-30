@@ -10,17 +10,20 @@ import {
   IconButton, LinearProgress, Tooltip,
 } from "@mui/material"
 
-import SearchIcon         from "@mui/icons-material/Search"
-import ApartmentIcon      from "@mui/icons-material/Apartment"
-import PeopleIcon         from "@mui/icons-material/People"
-import ReceiptLongIcon    from "@mui/icons-material/ReceiptLong"
-import DownloadIcon       from "@mui/icons-material/Download"
-import LocationOnIcon     from "@mui/icons-material/LocationOn"
-import CloseIcon          from "@mui/icons-material/Close"
-import CheckCircleIcon    from "@mui/icons-material/CheckCircle"
-import RefreshIcon        from "@mui/icons-material/Refresh"
-import FileDownloadIcon   from "@mui/icons-material/FileDownload"
-import CloudDownloadIcon  from "@mui/icons-material/CloudDownload"
+import SearchIcon              from "@mui/icons-material/Search"
+import ApartmentIcon           from "@mui/icons-material/Apartment"
+import PeopleIcon              from "@mui/icons-material/People"
+import ReceiptLongIcon         from "@mui/icons-material/ReceiptLong"
+import DownloadIcon            from "@mui/icons-material/Download"
+import LocationOnIcon          from "@mui/icons-material/LocationOn"
+import CloseIcon               from "@mui/icons-material/Close"
+import CheckCircleIcon         from "@mui/icons-material/CheckCircle"
+import RefreshIcon             from "@mui/icons-material/Refresh"
+import FileDownloadIcon        from "@mui/icons-material/FileDownload"
+import CloudDownloadIcon       from "@mui/icons-material/CloudDownload"
+import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet"
+import DeleteOutlineIcon       from "@mui/icons-material/DeleteOutline"
+import AttachFileIcon          from "@mui/icons-material/AttachFile"
 
 /* ── date helpers ── */
 const toDateStr = (d) => {
@@ -94,6 +97,18 @@ export default function Customers({ dark }) {
   /* per-customer download */
   const [downloadingCustomer, setDownloadingCustomer] = useState(null)
   const [toast, setToast] = useState({ open: false, message: "", type: "success" })
+
+  /* payment dialog */
+  const [payDialogOpen,  setPayDialogOpen]  = useState(false)
+  const [payCustomer,    setPayCustomer]    = useState(null)
+  const [payData,        setPayData]        = useState(null)   // { payments, outstanding, totalBilled, totalPaid }
+  const [payLoading,     setPayLoading]     = useState(false)
+  const [payAmount,      setPayAmount]      = useState("")
+  const [payMethod,      setPayMethod]      = useState("cash")
+  const [payNotes,       setPayNotes]       = useState("")
+  const [payScreenshot,  setPayScreenshot]  = useState(null)   // File object
+  const [paySubmitting,  setPaySubmitting]  = useState(false)
+  const [payUploading,   setPayUploading]   = useState(false)
 
   /* theme */
   const border        = dark ? "#1e293b" : "#e5e7eb"
@@ -239,6 +254,65 @@ export default function Customers({ dark }) {
 
     setDownloadingAll(false)
     setDlFinished(true)
+  }
+
+  /* ── payment helpers ── */
+  const fetchPayments = async (customerId) => {
+    setPayLoading(true); setPayData(null)
+    try {
+      const r = await API.get(`/payments/${customerId}?token=${getToken()}`)
+      setPayData(r.data)
+    } catch (err) {
+      setToast({ open: true, message: err.response?.data?.message || "Failed to load payments", type: "error" })
+    } finally { setPayLoading(false) }
+  }
+
+  const openPayDialog = (customer) => {
+    setPayCustomer(customer)
+    setPayAmount(""); setPayMethod("cash"); setPayNotes(""); setPayScreenshot(null)
+    setPayDialogOpen(true)
+    fetchPayments(customer.customer_id)
+  }
+
+  const submitPayment = async () => {
+    if (!payAmount || isNaN(parseFloat(payAmount))) {
+      setToast({ open: true, message: "Enter a valid amount", type: "error" }); return
+    }
+    setPaySubmitting(true)
+    try {
+      let screenshotUrl = null
+      if (payScreenshot) {
+        setPayUploading(true)
+        const fd = new FormData()
+        fd.append("screenshot", payScreenshot)
+        const upRes = await API.post(`/upload-payment-screenshot?token=${getToken()}`, fd, {
+          headers: { "Content-Type": "multipart/form-data" }
+        })
+        screenshotUrl = upRes.data.screenshot_url
+        setPayUploading(false)
+      }
+      await API.post(`/payments?token=${getToken()}`, {
+        customer_id:    payCustomer.customer_id,
+        amount:         parseFloat(payAmount),
+        payment_method: payMethod,
+        notes:          payNotes || undefined,
+        screenshot_url: screenshotUrl || undefined,
+      })
+      setToast({ open: true, message: "Payment recorded!", type: "success" })
+      setPayAmount(""); setPayNotes(""); setPayScreenshot(null)
+      fetchPayments(payCustomer.customer_id)
+    } catch (err) {
+      setToast({ open: true, message: err.response?.data?.message || "Failed to record payment", type: "error" })
+    } finally { setPaySubmitting(false); setPayUploading(false) }
+  }
+
+  const deletePayment = async (paymentId) => {
+    try {
+      await API.delete(`/payments/${paymentId}?token=${getToken()}`)
+      fetchPayments(payCustomer.customer_id)
+    } catch {
+      setToast({ open: true, message: "Failed to delete payment", type: "error" })
+    }
   }
 
   /* ── stats ── */
@@ -491,6 +565,13 @@ export default function Customers({ dark }) {
                       sx={{ textTransform: "none", fontWeight: 600, fontSize: 11.5, borderRadius: "7px", borderColor: "#7c3aed", color: "#7c3aed", py: 0.4, "&:hover": { background: dark ? "#2e1065" : "#faf5ff" } }}>
                       Bill
                     </Button>
+
+                    {/* Payments dialog */}
+                    <Button size="small" variant="outlined" startIcon={<AccountBalanceWalletIcon sx={{ fontSize: "14px !important" }} />}
+                      onClick={() => openPayDialog(c)}
+                      sx={{ textTransform: "none", fontWeight: 600, fontSize: 11.5, borderRadius: "7px", borderColor: "#16a34a", color: "#16a34a", py: 0.4, "&:hover": { background: dark ? "#14532d" : "#f0fdf4" } }}>
+                      Pay
+                    </Button>
                   </Box>
                 </Box>
               </Box>
@@ -605,6 +686,157 @@ export default function Customers({ dark }) {
             sx={{ textTransform: "none", fontWeight: 700, borderRadius: "8px", background: "#7c3aed", "&:hover": { background: "#6d28d9" } }}>
             Download Bill PDF
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ═══ PAYMENTS DIALOG ═══ */}
+      <Dialog open={payDialogOpen} onClose={() => setPayDialogOpen(false)} maxWidth="sm" fullWidth
+        PaperProps={{ sx: { borderRadius: 3, background: bg } }}>
+
+        <DialogTitle sx={{ pb: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <Box>
+            <Typography fontWeight={700} fontSize={15} color={textPrimary}>
+              Payments — {payCustomer?.phone}
+            </Typography>
+            {payCustomer?.address && (
+              <Typography fontSize={11.5} color={textSecondary}>{payCustomer.address}</Typography>
+            )}
+          </Box>
+          <IconButton size="small" onClick={() => setPayDialogOpen(false)}><CloseIcon fontSize="small" /></IconButton>
+        </DialogTitle>
+
+        <DialogContent dividers sx={{ borderColor: border }}>
+
+          {/* Balance summary */}
+          {payData && (
+            <Box display="flex" gap={1.5} flexWrap="wrap" mb={2}>
+              {[
+                { label: "Total Billed",   value: `₹${Number(payData.totalBilled).toFixed(2)}`,   color: "#2563eb", bg: dark ? "#1e3a5f" : "#eff6ff" },
+                { label: "Total Paid",     value: `₹${Number(payData.totalPaid).toFixed(2)}`,     color: "#16a34a", bg: dark ? "#14532d" : "#f0fdf4" },
+                { label: "Outstanding",    value: `₹${Number(payData.outstanding).toFixed(2)}`,   color: payData.outstanding > 0 ? "#dc2626" : "#16a34a", bg: payData.outstanding > 0 ? (dark ? "#450a0a" : "#fee2e2") : (dark ? "#14532d" : "#f0fdf4") },
+              ].map((s) => (
+                <Box key={s.label} sx={{ flex: "1 1 100px", px: 1.5, py: 0.8, borderRadius: 2, background: s.bg }}>
+                  <Typography fontSize={10} color={textSecondary}>{s.label}</Typography>
+                  <Typography fontSize={14} fontWeight={800} color={s.color}>{s.value}</Typography>
+                </Box>
+              ))}
+            </Box>
+          )}
+
+          {/* Mark Paid form */}
+          <Box sx={{ p: 1.5, borderRadius: 2, border: `1px solid ${border}`, background: bgCard, mb: 2 }}>
+            <Typography fontWeight={700} fontSize={13} color={textPrimary} mb={1.5}>Mark Payment</Typography>
+
+            <Box display="flex" gap={1} flexWrap="wrap" mb={1}>
+              <TextField size="small" label="Amount (₹)" type="number" value={payAmount}
+                onChange={(e) => setPayAmount(e.target.value)}
+                sx={{ flex: "1 1 100px", "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }} />
+
+              <Select size="small" value={payMethod} onChange={(e) => setPayMethod(e.target.value)}
+                sx={{ flex: "1 1 110px", borderRadius: 2, fontSize: 13 }}>
+                <MenuItem value="cash"    sx={{ fontSize: 13 }}>💵 Cash</MenuItem>
+                <MenuItem value="phonePe" sx={{ fontSize: 13 }}>📱 PhonePe</MenuItem>
+                <MenuItem value="upi"     sx={{ fontSize: 13 }}>🔗 UPI</MenuItem>
+                <MenuItem value="other"   sx={{ fontSize: 13 }}>🏦 Other</MenuItem>
+              </Select>
+            </Box>
+
+            <TextField size="small" label="Notes (optional)" value={payNotes}
+              onChange={(e) => setPayNotes(e.target.value)} fullWidth multiline rows={1}
+              sx={{ mb: 1, "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }} />
+
+            <Box display="flex" alignItems="center" gap={1} mb={1.5}>
+              <Button component="label" size="small" variant="outlined"
+                startIcon={<AttachFileIcon fontSize="small" />}
+                sx={{ textTransform: "none", fontSize: 12, borderRadius: "7px", borderColor: border, color: textSecondary }}>
+                {payScreenshot ? payScreenshot.name : "Attach Screenshot"}
+                <input type="file" hidden accept="image/*" onChange={(e) => setPayScreenshot(e.target.files[0] || null)} />
+              </Button>
+              {payScreenshot && (
+                <IconButton size="small" onClick={() => setPayScreenshot(null)} sx={{ p: 0.3 }}>
+                  <CloseIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+              )}
+            </Box>
+
+            <Button variant="contained" fullWidth
+              disabled={paySubmitting || !payAmount}
+              onClick={submitPayment}
+              startIcon={paySubmitting ? <CircularProgress size={14} color="inherit" /> : <AccountBalanceWalletIcon fontSize="small" />}
+              sx={{ textTransform: "none", fontWeight: 700, fontSize: 13, borderRadius: "8px", background: "#16a34a", "&:hover": { background: "#15803d" } }}>
+              {payUploading ? "Uploading screenshot…" : paySubmitting ? "Recording…" : "Record Payment"}
+            </Button>
+          </Box>
+
+          {/* Payment history */}
+          <Typography fontWeight={700} fontSize={13} color={textPrimary} mb={1}>Payment History</Typography>
+
+          {payLoading && <Box py={4} textAlign="center"><CircularProgress size={22} sx={{ color: "#16a34a" }} /></Box>}
+
+          {!payLoading && payData?.payments?.length === 0 && (
+            <Box py={3} textAlign="center">
+              <Typography fontSize={13} color={textSecondary}>No payments recorded yet.</Typography>
+            </Box>
+          )}
+
+          {!payLoading && payData?.payments?.length > 0 && (
+            <Box sx={{ overflowX: "auto" }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow sx={{ background: bgCard }}>
+                    {["Date", "Amount", "Method", "By", "Notes", ""].map((h) => (
+                      <TableCell key={h} sx={{ fontWeight: 700, fontSize: 11, color: textSecondary, borderColor: border }}>{h}</TableCell>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {payData.payments.map((p) => {
+                    const methodLabel = { cash: "Cash", phonePe: "PhonePe", upi: "UPI", other: "Other" }[p.payment_method] || p.payment_method
+                    return (
+                      <TableRow key={p.payment_id} sx={{ "&:hover": { background: bgCard } }}>
+                        <TableCell sx={{ fontSize: 12, color: textPrimary, borderColor: border }}>
+                          {fmtDate(String(p.payment_date).slice(0, 10))}
+                        </TableCell>
+                        <TableCell sx={{ fontSize: 12, fontWeight: 700, color: "#16a34a", borderColor: border }}>
+                          ₹{Number(p.amount).toFixed(2)}
+                        </TableCell>
+                        <TableCell sx={{ fontSize: 12, color: textPrimary, borderColor: border }}>{methodLabel}</TableCell>
+                        <TableCell sx={{ fontSize: 11, borderColor: border }}>
+                          <Chip label={p.recorded_by} size="small"
+                            sx={{ fontSize: 10, height: 16, fontWeight: 600,
+                              background: p.recorded_by === "customer" ? (dark ? "#1e3a5f" : "#eff6ff") : (dark ? "#14532d" : "#f0fdf4"),
+                              color: p.recorded_by === "customer" ? "#2563eb" : "#16a34a" }} />
+                        </TableCell>
+                        <TableCell sx={{ fontSize: 11, color: textSecondary, borderColor: border, maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {p.notes || "—"}
+                        </TableCell>
+                        <TableCell sx={{ borderColor: border, p: 0.5 }}>
+                          {p.screenshot_url && (
+                            <Tooltip title="View screenshot" arrow>
+                              <IconButton size="small" component="a" href={p.screenshot_url} target="_blank" rel="noopener"
+                                sx={{ p: 0.3, color: textSecondary }}>
+                                <AttachFileIcon sx={{ fontSize: 14 }} />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          <Tooltip title="Delete payment" arrow>
+                            <IconButton size="small" onClick={() => deletePayment(p.payment_id)}
+                              sx={{ p: 0.3, color: "#ef4444", "&:hover": { background: dark ? "#450a0a" : "#fee2e2" } }}>
+                              <DeleteOutlineIcon sx={{ fontSize: 14 }} />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </Box>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ px: 2.5, py: 1.5 }}>
+          <Button onClick={() => setPayDialogOpen(false)} sx={{ textTransform: "none", color: textSecondary }}>Close</Button>
         </DialogActions>
       </Dialog>
 
