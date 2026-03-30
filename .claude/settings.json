@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Read(//e//**)"
+      "Read(//e//**)",
+      "Read(//e/Navya Projects/MilkWhatsAppBot/**)",
+      "Bash(cd /e/Navya Projects/MilkWhatsAppBot)"
+    ],
+    "additionalDirectories": [
+      "E:\\Navya Projects\\MilkWhatsAppBot\\routes"
     ]
   }
 }
