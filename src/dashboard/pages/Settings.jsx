@@ -279,35 +279,90 @@ export default function Settings({ dark }) {
           </Section>
 
           {/* WhatsApp Share Link */}
-          {(p.whatsapp_api_number || p.whatsapp_number) && (
-            <Section title="WhatsApp Share Link" icon={<ShareIcon fontSize="small" />} color="#16a34a" dark={dark}>
-              <Box sx={{ px: 2.5, py: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
-                <Typography fontSize={12} color={textSecondary} lineHeight={1.5}>
-                  Share this link with your customers. When they tap it, WhatsApp opens with a "Hi" message sent to your number.
-                </Typography>
-                <Box sx={{
-                  display: "flex", alignItems: "center", gap: 1,
-                  px: 1.5, py: 1.2, borderRadius: 2,
-                  background: dark ? "#052e16" : "#f0fdf4",
-                  border: `1px solid ${dark ? "#14532d" : "#bbf7d0"}`,
-                }}>
-                  <WhatsAppIcon sx={{ fontSize: 18, color: "#16a34a", flexShrink: 0 }} />
-                  <Typography fontSize={12.5} fontWeight={500} color={dark ? "#86efac" : "#15803d"} sx={{ flex: 1, wordBreak: "break-all" }}>
-                    {`https://wa.me/${p.whatsapp_api_number || p.whatsapp_number}?text=Hi`}
-                  </Typography>
-                  <Tooltip title={linkCopied ? "Copied!" : "Copy link"} placement="top">
-                    <IconButton size="small" onClick={() => {
-                      navigator.clipboard.writeText(`https://wa.me/${p.whatsapp_api_number || p.whatsapp_number}?text=Hi`)
-                      setLinkCopied(true)
-                      setTimeout(() => setLinkCopied(false), 2000)
-                    }}>
-                      <ContentCopyIcon sx={{ fontSize: 16, color: linkCopied ? "#16a34a" : textSecondary }} />
-                    </IconButton>
-                  </Tooltip>
+          {(p.whatsapp_api_number || p.whatsapp_number) && (() => {
+            const waNumber  = p.whatsapp_api_number || p.whatsapp_number
+            const waLink    = `https://wa.me/${waNumber}?text=Hi`
+            const shareText = `🥛 *${p.business_name || "Milk Delivery"}*\n\nSubscribe to our daily milk delivery service!\n\n` +
+              `📲 Just send *Hi* to get started.\n` +
+              `You can also:\n• ⏸ Pause your delivery\n• 📄 Get your monthly bill\n• 🛒 Change your order quantity\n\n` +
+              `👇 Tap to open WhatsApp:\n${waLink}`
+            return (
+              <Section title="WhatsApp Share Link" icon={<ShareIcon fontSize="small" />} color="#16a34a" dark={dark}>
+                <Box sx={{ px: 2.5, py: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
+
+                  {/* Description */}
+                  <Box sx={{
+                    p: 1.5, borderRadius: 2,
+                    background: dark ? "#052e16" : "#f0fdf4",
+                    border: `1px solid ${dark ? "#14532d" : "#bbf7d0"}`,
+                  }}>
+                    <Typography fontSize={12} fontWeight={600} color={dark ? "#86efac" : "#15803d"} mb={0.5}>
+                      Share with your customers
+                    </Typography>
+                    <Typography fontSize={12} color={textSecondary} lineHeight={1.6}>
+                      When customers tap this link, WhatsApp opens and they can send{" "}
+                      <Box component="span" fontWeight={700} color={dark ? "#f1f5f9" : "#111827"}>"Hi"</Box>{" "}
+                      to subscribe, pause delivery, or get their monthly bill.
+                    </Typography>
+                  </Box>
+
+                  {/* Link row */}
+                  <Box sx={{
+                    display: "flex", alignItems: "center", gap: 1,
+                    px: 1.5, py: 1.2, borderRadius: 2,
+                    background: dark ? "#0a1a0a" : "#f0fdf4",
+                    border: `1px solid ${dark ? "#14532d" : "#bbf7d0"}`,
+                  }}>
+                    <WhatsAppIcon sx={{ fontSize: 18, color: "#16a34a", flexShrink: 0 }} />
+                    <Typography fontSize={12.5} fontWeight={500} color={dark ? "#86efac" : "#15803d"} sx={{ flex: 1, wordBreak: "break-all" }}>
+                      {waLink}
+                    </Typography>
+                  </Box>
+
+                  {/* Action buttons */}
+                  <Box display="flex" gap={1.5} flexWrap="wrap">
+                    {/* Copy link */}
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<ContentCopyIcon fontSize="small" />}
+                      onClick={() => {
+                        navigator.clipboard.writeText(waLink)
+                        setLinkCopied(true)
+                        setTimeout(() => setLinkCopied(false), 2000)
+                      }}
+                      sx={{
+                        textTransform: "none", fontWeight: 600, fontSize: 12,
+                        borderRadius: "8px",
+                        borderColor: linkCopied ? "#16a34a" : border,
+                        color: linkCopied ? "#16a34a" : textSecondary,
+                        "&:hover": { borderColor: "#16a34a", color: "#16a34a", background: "transparent" },
+                      }}
+                    >
+                      {linkCopied ? "Copied!" : "Copy Link"}
+                    </Button>
+
+                    {/* Share via WhatsApp */}
+                    <Button
+                      size="small"
+                      variant="contained"
+                      startIcon={<WhatsAppIcon fontSize="small" />}
+                      onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, "_blank")}
+                      sx={{
+                        textTransform: "none", fontWeight: 600, fontSize: 12,
+                        borderRadius: "8px",
+                        background: "#16a34a",
+                        "&:hover": { background: "#15803d" },
+                      }}
+                    >
+                      Share via WhatsApp
+                    </Button>
+                  </Box>
+
                 </Box>
-              </Box>
-            </Section>
-          )}
+              </Section>
+            )
+          })()}
 
           {/* Delivery Timings */}
           <Section title="Delivery Timings" icon={<AccessTimeIcon fontSize="small" />} color="#16a34a" dark={dark}>
