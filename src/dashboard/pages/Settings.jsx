@@ -4,7 +4,7 @@ import API, { getToken } from "../../services/api"
 import {
   Box, Typography, Paper, Switch, Button, Divider,
   CircularProgress, Chip, TextField, InputAdornment,
-  Alert, Collapse, Tab, Tabs, Avatar,
+  Alert, Collapse, Tab, Tabs, Avatar, IconButton, Tooltip,
 } from "@mui/material"
 
 import SettingsIcon       from "@mui/icons-material/Settings"
@@ -23,6 +23,10 @@ import ImageIcon          from "@mui/icons-material/Image"
 import LockClockIcon      from "@mui/icons-material/LockClock"
 import StorefrontIcon     from "@mui/icons-material/Storefront"
 import AutorenewIcon      from "@mui/icons-material/Autorenew"
+import VisibilityIcon     from "@mui/icons-material/Visibility"
+import ContentCopyIcon    from "@mui/icons-material/ContentCopy"
+import WhatsAppIcon       from "@mui/icons-material/WhatsApp"
+import ShareIcon          from "@mui/icons-material/Share"
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
@@ -88,6 +92,8 @@ export default function Settings({ dark }) {
   const [pSave, setPSave]   = useState(false)
   const [pDirty, setPDirty] = useState(false)
   const [pSaved, setPSaved] = useState(false)
+
+  const [linkCopied, setLinkCopied] = useState(false)
 
   // logo upload
   const [logoFile, setLogoFile]       = useState(null)
@@ -272,6 +278,37 @@ export default function Settings({ dark }) {
             </Box>
           </Section>
 
+          {/* WhatsApp Share Link */}
+          {p.whatsapp_number && (
+            <Section title="WhatsApp Share Link" icon={<ShareIcon fontSize="small" />} color="#16a34a" dark={dark}>
+              <Box sx={{ px: 2.5, py: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
+                <Typography fontSize={12} color={textSecondary} lineHeight={1.5}>
+                  Share this link with your customers. When they tap it, WhatsApp opens with a "Hi" message sent to your number.
+                </Typography>
+                <Box sx={{
+                  display: "flex", alignItems: "center", gap: 1,
+                  px: 1.5, py: 1.2, borderRadius: 2,
+                  background: dark ? "#052e16" : "#f0fdf4",
+                  border: `1px solid ${dark ? "#14532d" : "#bbf7d0"}`,
+                }}>
+                  <WhatsAppIcon sx={{ fontSize: 18, color: "#16a34a", flexShrink: 0 }} />
+                  <Typography fontSize={12.5} fontWeight={500} color={dark ? "#86efac" : "#15803d"} sx={{ flex: 1, wordBreak: "break-all" }}>
+                    {`https://wa.me/${p.whatsapp_number}?text=Hi`}
+                  </Typography>
+                  <Tooltip title={linkCopied ? "Copied!" : "Copy link"} placement="top">
+                    <IconButton size="small" onClick={() => {
+                      navigator.clipboard.writeText(`https://wa.me/${p.whatsapp_number}?text=Hi`)
+                      setLinkCopied(true)
+                      setTimeout(() => setLinkCopied(false), 2000)
+                    }}>
+                      <ContentCopyIcon sx={{ fontSize: 16, color: linkCopied ? "#16a34a" : textSecondary }} />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              </Box>
+            </Section>
+          )}
+
           {/* Delivery Timings */}
           <Section title="Delivery Timings" icon={<AccessTimeIcon fontSize="small" />} color="#16a34a" dark={dark}>
             <Box sx={{ p: 2.5, display: "flex", flexDirection: "column", gap: 2 }}>
@@ -381,6 +418,19 @@ export default function Settings({ dark }) {
                 {i < arr.length - 1 && <Divider sx={{ borderColor: border }} />}
               </Box>
             ))}
+          </Section>
+
+          {/* Privacy */}
+          <Section title="Privacy" icon={<VisibilityIcon fontSize="small" />} color="#7c3aed" dark={dark}>
+            <SettingRow
+              icon={<VisibilityIcon sx={{ fontSize: 17 }} />}
+              label="Show Customer Phone Numbers"
+              desc="Display customer phone numbers in the Orders list. Turn off to hide them for privacy."
+              checked={!!s.show_phone_numbers}
+              onChange={() => toggleS("show_phone_numbers")}
+              color="#7c3aed"
+              dark={dark}
+            />
           </Section>
 
           {/* Price per unit */}

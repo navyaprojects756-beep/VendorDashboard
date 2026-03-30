@@ -54,6 +54,7 @@ export default function Orders({ dark }) {
   const [orders,     setOrders]     = useState([])
   const [filtered,   setFiltered]   = useState([])
   const [generating, setGenerating] = useState(false)
+  const [showPhone,  setShowPhone]  = useState(true)
 
   const generate = async () => {
     setGenerating(true)
@@ -81,6 +82,9 @@ export default function Orders({ dark }) {
 
   /* ── LOAD ── */
   useEffect(() => {
+    API.get(`/settings?token=${getToken()}`).then((r) => {
+      setShowPhone(r.data.show_phone_numbers !== false)
+    }).catch(() => {})
     API.get(`/orders?token=${getToken()}`).then((res) => {
       setOrders(res.data.orders)
       const uniqueApts = [
@@ -462,8 +466,9 @@ export default function Orders({ dark }) {
               >
                 {/* LEFT */}
                 <Box flex={1} minWidth={0}>
-                  <Typography fontWeight={700} fontSize={15} mb={0.4}>
-                    {o.phone}
+                  <Typography fontWeight={700} fontSize={15} mb={0.4} color={showPhone ? "text.primary" : "text.disabled"}
+                    sx={{ letterSpacing: showPhone ? "normal" : "0.1em" }}>
+                    {showPhone ? o.phone : `••••••• ${String(o.phone).slice(-3)}`}
                   </Typography>
 
                   {o.address && (
@@ -486,7 +491,17 @@ export default function Orders({ dark }) {
                           wordBreak: "break-word",
                         }}
                       >
-                        {o.address}
+                        {(() => {
+                          const addr = o.address || ""
+                          const match = addr.match(/^(Flat\s+\S+)(,?\s*)(.*)/i)
+                          if (match) return (
+                            <>
+                              <Box component="span" fontWeight={700} color="text.primary">{match[1]}</Box>
+                              {match[2]}{match[3]}
+                            </>
+                          )
+                          return addr
+                        })()}
                       </Typography>
 
                       {isLong && (
