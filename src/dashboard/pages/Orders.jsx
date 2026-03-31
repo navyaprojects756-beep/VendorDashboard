@@ -29,6 +29,9 @@ import LocalShippingIcon  from "@mui/icons-material/LocalShipping"
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty"
 import CalendarTodayIcon  from "@mui/icons-material/CalendarToday"
 import AutorenewIcon      from "@mui/icons-material/Autorenew"
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline"
+import HighlightOffIcon   from "@mui/icons-material/HighlightOff"
+import LinkOffIcon        from "@mui/icons-material/LinkOff"
 
 /* ── date helpers ── */
 const toDateStr = (d) => d.toISOString().split("T")[0]
@@ -50,12 +53,26 @@ const isSameDay = (orderDate, targetStr) => {
 
 /* ─────────────────────────────────────── */
 
+/* ── token expiry helper ── */
+const isTokenExpired = () => {
+  try {
+    const token = getToken()
+    if (!token) return false
+    const payload = JSON.parse(atob(token.split(".")[1]))
+    return payload.exp && payload.exp * 1000 < Date.now()
+  } catch {
+    return false
+  }
+}
+
 export default function Orders({ dark }) {
   const isAdmin = getRole() === "admin"
-  const [orders,     setOrders]     = useState([])
-  const [filtered,   setFiltered]   = useState([])
-  const [generating, setGenerating] = useState(false)
-  const [showPhone,  setShowPhone]  = useState(true)
+  const [orders,       setOrders]       = useState([])
+  const [filtered,     setFiltered]     = useState([])
+  const [generating,   setGenerating]   = useState(false)
+  const [showPhone,    setShowPhone]    = useState(true)
+  const [tokenExpired, setTokenExpired] = useState(false)
+  const [bulkLoading,  setBulkLoading]  = useState(false)
 
   const generate = async () => {
     setGenerating(true)
@@ -83,6 +100,7 @@ export default function Orders({ dark }) {
 
   /* ── LOAD ── */
   useEffect(() => {
+    if (isTokenExpired()) { setTokenExpired(true); return }
     API.get(`/settings?token=${getToken()}`).then((r) => {
       setShowPhone(r.data.show_phone_numbers !== false)
     }).catch(() => {})
@@ -92,6 +110,10 @@ export default function Orders({ dark }) {
         ...new Set(res.data.orders.map((o) => o.apartment).filter(Boolean)),
       ]
       setApartments(uniqueApts)
+    }).catch((err) => {
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        setTokenExpired(true)
+      }
     })
   }, [])
 
@@ -169,6 +191,36 @@ export default function Orders({ dark }) {
     )
   }
 
+  /* ── BULK TOGGLE ── */
+  const bulkToggle = async (targetDelivered) => {
+    const toUpdate = filtered.filter((o) => !!o.is_delivered !== targetDelivered)
+    if (toUpdate.length === 0) return
+    setBulkLoading(true)
+    try {
+      const results = await Promise.allSettled(
+        toUpdate.map((o) => API.patch(`/orders/${o.order_id}/delivered?token=${getToken()}`))
+      )
+      const updates = {}
+      results.forEach((r, i) => {
+        if (r.status === "fulfilled") {
+          updates[toUpdate[i].order_id] = {
+            is_delivered: r.value.data?.is_delivered ?? targetDelivered,
+            delivered_at: r.value.data?.delivered_at || null,
+          }
+        }
+      })
+      setOrders((prev) =>
+        prev.map((o) =>
+          updates[o.order_id]
+            ? { ...o, ...updates[o.order_id] }
+            : o
+        )
+      )
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
   /* ── EXPAND ADDRESS ── */
   const toggleExpand = (id) =>
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }))
@@ -187,6 +239,30 @@ export default function Orders({ dark }) {
     `${fromDate} → ${toDate}`
 
   /* ═══════════════════ RENDER ═══════════════════ */
+  if (tokenExpired) {
+    return (
+      <Box sx={{ maxWidth: 780, margin: "auto", px: { xs: 1, sm: 2 }, py: 3 }}>
+        <Paper
+          elevation={0}
+          sx={{
+            p: 4, borderRadius: 3, border: "1px solid #fca5a5",
+            background: "#fff7f7", textAlign: "center",
+          }}
+        >
+          <LinkOffIcon sx={{ fontSize: 48, color: "#ef4444", mb: 1.5 }} />
+          <Typography fontWeight={700} fontSize={17} mb={1}>
+            Link Expired
+          </Typography>
+          <Typography color="text.secondary" fontSize={14} lineHeight={1.6}>
+            Your access link has expired or is no longer valid.
+            <br />
+            Please ask your vendor to regenerate and share a new link.
+          </Typography>
+        </Paper>
+      </Box>
+    )
+  }
+
   return (
     <Box sx={{ maxWidth: 780, margin: "auto", px: { xs: 1, sm: 2 }, py: 3 }}>
 
@@ -427,13 +503,48 @@ export default function Orders({ dark }) {
         </Box>
       </Paper>
 
-      {/* ══ COUNT ROW ══ */}
-      <Typography fontSize={13} color="text.secondary" mb={1} px={0.5}>
-        {filtered.length} order{filtered.length !== 1 ? "s" : ""} —{" "}
-        <Box component="span" fontWeight={700} color="text.primary">
-          {dateLabel}
-        </Box>
-      </Typography>
+      {/* ══ COUNT + BULK ACTIONS ROW ══ */}
+      <Box display="flex" alignItems="center" justifyContent="space-between" mb={1} px={0.5} flexWrap="wrap" gap={1}>
+        <Typography fontSize={13} color="text.secondary">
+          {filtered.length} order{filtered.length !== 1 ? "s" : ""} —{" "}
+          <Box component="span" fontWeight={700} color="text.primary">
+            {dateLabel}
+          </Box>
+        </Typography>
+
+        {filtered.length > 0 && (
+          <Box display="flex" gap={1}>
+            <Button
+              size="small"
+              variant="outlined"
+              disabled={bulkLoading}
+              onClick={() => bulkToggle(true)}
+              startIcon={bulkLoading ? <CircularProgress size={13} /> : <CheckCircleOutlineIcon fontSize="small" />}
+              sx={{
+                textTransform: "none", fontWeight: 600, fontSize: 12,
+                borderRadius: "8px", borderColor: "#22c55e", color: "#16a34a",
+                "&:hover": { borderColor: "#16a34a", background: "#f0fdf4" },
+              }}
+            >
+              All Delivered
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              disabled={bulkLoading}
+              onClick={() => bulkToggle(false)}
+              startIcon={bulkLoading ? <CircularProgress size={13} /> : <HighlightOffIcon fontSize="small" />}
+              sx={{
+                textTransform: "none", fontWeight: 600, fontSize: 12,
+                borderRadius: "8px", borderColor: "#f97316", color: "#ea580c",
+                "&:hover": { borderColor: "#ea580c", background: "#fff7ed" },
+              }}
+            >
+              All Pending
+            </Button>
+          </Box>
+        )}
+      </Box>
 
       {/* ══ ORDER LIST ══ */}
       <Paper
