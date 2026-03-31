@@ -20,6 +20,8 @@ import RefreshIcon              from "@mui/icons-material/Refresh"
 import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet"
 import DeleteOutlineIcon        from "@mui/icons-material/DeleteOutline"
 import AttachFileIcon           from "@mui/icons-material/AttachFile"
+import CheckIcon                from "@mui/icons-material/Check"
+import BlockIcon                from "@mui/icons-material/Block"
 
 /* ── date helpers ── */
 const toDateStr = (d) => {
@@ -195,6 +197,8 @@ export default function Customers({ dark }) {
         payment_method: payMethod,
         notes:          payNotes || undefined,
         screenshot_url: screenshotUrl || undefined,
+        period_from:    range.from,
+        period_to:      range.to,
       })
       setToast({ open: true, message: "Payment recorded!", type: "success" })
       setPayAmount(""); setPayNotes(""); setPayScreenshot(null)
@@ -210,6 +214,26 @@ export default function Customers({ dark }) {
       fetchPayments(payCustomer.customer_id)
     } catch {
       setToast({ open: true, message: "Failed to delete payment", type: "error" })
+    }
+  }
+
+  const verifyPayment = async (paymentId) => {
+    try {
+      await API.patch(`/payments/${paymentId}/verify?token=${getToken()}`)
+      setToast({ open: true, message: "Payment verified!", type: "success" })
+      fetchPayments(payCustomer.customer_id)
+    } catch {
+      setToast({ open: true, message: "Failed to verify payment", type: "error" })
+    }
+  }
+
+  const revokePayment = async (paymentId) => {
+    try {
+      await API.patch(`/payments/${paymentId}/revoke?token=${getToken()}`)
+      setToast({ open: true, message: "Payment revoked — orders reset to unpaid.", type: "success" })
+      fetchPayments(payCustomer.customer_id)
+    } catch {
+      setToast({ open: true, message: "Failed to revoke payment", type: "error" })
     }
   }
 
@@ -429,36 +453,62 @@ export default function Customers({ dark }) {
                   <Box py={4} textAlign="center">
                     <Typography color={textSecondary} fontSize={13}>No delivered orders in this period.</Typography>
                   </Box>
-                ) : (
-                  <Box sx={{ overflowX: "auto" }}>
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow sx={{ background: bgCard }}>
-                          {["#", "Date", "Packets", "Rate", "Amount"].map((h) => (
-                            <TableCell key={h} sx={{ fontWeight: 700, fontSize: 11.5, color: textSecondary, borderColor: border }}>{h}</TableCell>
-                          ))}
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {delivered.map((o, i) => (
-                          <TableRow key={i} sx={{ "&:hover": { background: bgCard } }}>
-                            <TableCell sx={{ fontSize: 12, color: textSecondary, borderColor: border }}>{i + 1}</TableCell>
-                            <TableCell sx={{ fontSize: 12, fontWeight: 600, color: textPrimary, borderColor: border }}>{fmtDate(String(o.order_date).slice(0, 10))}</TableCell>
-                            <TableCell sx={{ fontSize: 12, color: textPrimary, borderColor: border }}>{o.quantity}</TableCell>
-                            <TableCell sx={{ fontSize: 12, color: textSecondary, borderColor: border }}>₹{rate.toFixed(2)}</TableCell>
-                            <TableCell sx={{ fontSize: 12, fontWeight: 700, color: "#2563eb", borderColor: border }}>₹{(o.quantity * rate).toFixed(2)}</TableCell>
+                ) : (() => {
+                  const paidRows   = delivered.filter(o => o.payment_status === "paid")
+                  const unpaidRows = delivered.filter(o => o.payment_status !== "paid")
+                  const unpaidAmt  = unpaidRows.reduce((s, o) => s + o.quantity * rate, 0)
+                  return (
+                    <Box sx={{ overflowX: "auto" }}>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow sx={{ background: bgCard }}>
+                            {["#", "Date", "Packets", "Rate", "Amount", "Status"].map((h) => (
+                              <TableCell key={h} sx={{ fontWeight: 700, fontSize: 11.5, color: textSecondary, borderColor: border }}>{h}</TableCell>
+                            ))}
                           </TableRow>
-                        ))}
-                        <TableRow sx={{ background: bgCard }}>
-                          <TableCell colSpan={2} sx={{ fontWeight: 700, fontSize: 13, color: textPrimary, borderColor: border }}>Total</TableCell>
-                          <TableCell sx={{ fontWeight: 700, fontSize: 13, color: textPrimary, borderColor: border }}>{totalQty}</TableCell>
-                          <TableCell sx={{ borderColor: border }} />
-                          <TableCell sx={{ fontWeight: 800, fontSize: 13, color: "#16a34a", borderColor: border }}>₹{totalAmt.toFixed(2)}</TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </Box>
-                )}
+                        </TableHead>
+                        <TableBody>
+                          {delivered.map((o, i) => {
+                            const isPaid = o.payment_status === "paid"
+                            return (
+                              <TableRow key={i} sx={{ background: isPaid ? (dark ? "#0f2d1a" : "#f0fdf4") : "inherit", "&:hover": { background: bgCard } }}>
+                                <TableCell sx={{ fontSize: 12, color: textSecondary, borderColor: border }}>{i + 1}</TableCell>
+                                <TableCell sx={{ fontSize: 12, fontWeight: 600, color: textPrimary, borderColor: border }}>{fmtDate(String(o.order_date).slice(0, 10))}</TableCell>
+                                <TableCell sx={{ fontSize: 12, color: textPrimary, borderColor: border }}>{o.quantity}</TableCell>
+                                <TableCell sx={{ fontSize: 12, color: textSecondary, borderColor: border }}>₹{rate.toFixed(2)}</TableCell>
+                                <TableCell sx={{ fontSize: 12, fontWeight: 700, color: isPaid ? "#16a34a" : "#2563eb", borderColor: border }}>₹{(o.quantity * rate).toFixed(2)}</TableCell>
+                                <TableCell sx={{ borderColor: border }}>
+                                  <Chip label={isPaid ? "Paid" : "Unpaid"} size="small"
+                                    sx={{ fontSize: 10, fontWeight: 700, height: 18,
+                                      background: isPaid ? (dark ? "#14532d" : "#dcfce7") : (dark ? "#450a0a" : "#fee2e2"),
+                                      color: isPaid ? "#16a34a" : "#dc2626" }} />
+                                </TableCell>
+                              </TableRow>
+                            )
+                          })}
+                          {/* Totals row */}
+                          <TableRow sx={{ background: bgCard }}>
+                            <TableCell colSpan={2} sx={{ fontWeight: 700, fontSize: 13, color: textPrimary, borderColor: border }}>Total</TableCell>
+                            <TableCell sx={{ fontWeight: 700, fontSize: 13, color: textPrimary, borderColor: border }}>{totalQty}</TableCell>
+                            <TableCell sx={{ borderColor: border }} />
+                            <TableCell sx={{ fontWeight: 800, fontSize: 13, color: "#16a34a", borderColor: border }}>₹{totalAmt.toFixed(2)}</TableCell>
+                            <TableCell sx={{ borderColor: border }} />
+                          </TableRow>
+                          {/* Outstanding row — only if some unpaid */}
+                          {unpaidRows.length > 0 && paidRows.length > 0 && (
+                            <TableRow sx={{ background: dark ? "#2d0a0a" : "#fff5f5" }}>
+                              <TableCell colSpan={2} sx={{ fontWeight: 700, fontSize: 12, color: "#dc2626", borderColor: border }}>Outstanding</TableCell>
+                              <TableCell sx={{ fontWeight: 700, fontSize: 12, color: "#dc2626", borderColor: border }}>{unpaidRows.reduce((s,o)=>s+o.quantity,0)}</TableCell>
+                              <TableCell sx={{ borderColor: border }} />
+                              <TableCell sx={{ fontWeight: 800, fontSize: 12, color: "#dc2626", borderColor: border }}>₹{unpaidAmt.toFixed(2)}</TableCell>
+                              <TableCell sx={{ borderColor: border }} />
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </Box>
+                  )
+                })()}
               </>
             )
           })()}
@@ -556,7 +606,7 @@ export default function Customers({ dark }) {
               <Table size="small">
                 <TableHead>
                   <TableRow sx={{ background: bgCard }}>
-                    {["Date", "Amount", "Method", "By", "Notes", ""].map((h) => (
+                    {["Date", "Amount", "Method", "Status", "Notes", "Actions"].map((h) => (
                       <TableCell key={h} sx={{ fontWeight: 700, fontSize: 11, color: textSecondary, borderColor: border }}>{h}</TableCell>
                     ))}
                   </TableRow>
@@ -564,21 +614,30 @@ export default function Customers({ dark }) {
                 <TableBody>
                   {payData.payments.map((p) => {
                     const ml = { cash: "Cash", phonePe: "PhonePe", upi: "UPI", other: "Other" }[p.payment_method] || p.payment_method
+                    const isRevoked  = p.is_revoked
+                    const isVerified = p.is_verified && !p.is_revoked
+                    const isPending  = !p.is_verified && !p.is_revoked
                     return (
-                      <TableRow key={p.payment_id} sx={{ "&:hover": { background: bgCard } }}>
+                      <TableRow key={p.payment_id}
+                        sx={{ background: isRevoked ? (dark ? "#1a0a0a" : "#fff5f5") : isVerified ? (dark ? "#0f2d1a" : "#f0fdf4") : "inherit", "&:hover": { background: bgCard } }}>
                         <TableCell sx={{ fontSize: 12, color: textPrimary, borderColor: border }}>{fmtDate(String(p.payment_date).slice(0, 10))}</TableCell>
-                        <TableCell sx={{ fontSize: 12, fontWeight: 700, color: "#16a34a", borderColor: border }}>₹{Number(p.amount).toFixed(2)}</TableCell>
+                        <TableCell sx={{ fontSize: 12, fontWeight: 700, color: isRevoked ? "#ef4444" : "#16a34a", borderColor: border, textDecoration: isRevoked ? "line-through" : "none" }}>
+                          ₹{Number(p.amount).toFixed(2)}
+                        </TableCell>
                         <TableCell sx={{ fontSize: 12, color: textPrimary, borderColor: border }}>{ml}</TableCell>
                         <TableCell sx={{ fontSize: 11, borderColor: border }}>
-                          <Chip label={p.recorded_by} size="small"
+                          <Chip label={isRevoked ? "Revoked" : isVerified ? "Verified" : p.recorded_by === "customer" ? "Customer" : "Vendor"}
+                            size="small"
                             sx={{ fontSize: 10, height: 16, fontWeight: 600,
-                              background: p.recorded_by === "customer" ? (dark ? "#1e3a5f" : "#eff6ff") : (dark ? "#14532d" : "#f0fdf4"),
-                              color: p.recorded_by === "customer" ? "#2563eb" : "#16a34a" }} />
+                              background: isRevoked  ? (dark ? "#450a0a" : "#fee2e2") :
+                                          isVerified ? (dark ? "#14532d" : "#dcfce7") :
+                                          p.recorded_by === "customer" ? (dark ? "#1e3a5f" : "#eff6ff") : (dark ? "#14532d" : "#f0fdf4"),
+                              color: isRevoked ? "#dc2626" : isVerified ? "#16a34a" : p.recorded_by === "customer" ? "#2563eb" : "#16a34a" }} />
                         </TableCell>
-                        <TableCell sx={{ fontSize: 11, color: textSecondary, borderColor: border, maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <TableCell sx={{ fontSize: 11, color: textSecondary, borderColor: border, maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {p.notes || "—"}
                         </TableCell>
-                        <TableCell sx={{ borderColor: border, p: 0.5 }}>
+                        <TableCell sx={{ borderColor: border, p: 0.5, whiteSpace: "nowrap" }}>
                           {p.screenshot_url && (
                             <Tooltip title="View screenshot" arrow>
                               <IconButton size="small" component="a" href={p.screenshot_url} target="_blank" rel="noopener"
@@ -587,7 +646,23 @@ export default function Customers({ dark }) {
                               </IconButton>
                             </Tooltip>
                           )}
-                          <Tooltip title="Delete" arrow>
+                          {isPending && (
+                            <Tooltip title="Verify payment" arrow>
+                              <IconButton size="small" onClick={() => verifyPayment(p.payment_id)}
+                                sx={{ p: 0.3, color: "#16a34a", "&:hover": { background: dark ? "#14532d" : "#f0fdf4" } }}>
+                                <CheckIcon sx={{ fontSize: 14 }} />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {!isRevoked && (
+                            <Tooltip title="Revoke — reset orders to unpaid" arrow>
+                              <IconButton size="small" onClick={() => revokePayment(p.payment_id)}
+                                sx={{ p: 0.3, color: "#f97316", "&:hover": { background: dark ? "#431407" : "#fff7ed" } }}>
+                                <BlockIcon sx={{ fontSize: 14 }} />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          <Tooltip title="Delete payment" arrow>
                             <IconButton size="small" onClick={() => deletePayment(p.payment_id)}
                               sx={{ p: 0.3, color: "#ef4444", "&:hover": { background: dark ? "#450a0a" : "#fee2e2" } }}>
                               <DeleteOutlineIcon sx={{ fontSize: 14 }} />
