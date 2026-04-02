@@ -507,6 +507,20 @@ export default function Settings({ dark }) {
                 slotProps={{ input: { min: 0, step: 0.5, startAdornment: <InputAdornment position="start"><Typography fontSize={14} fontWeight={700}>₹</Typography></InputAdornment> } }}
                 sx={{ width: 110, "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 15, fontWeight: 700 } }} />
             </Box>
+            <Divider />
+            <Box sx={{ px: 2.5, py: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
+              <Box flex={1}>
+                <Typography fontWeight={600} fontSize={13.5} color={textPrimary}>Vendor Contact Phone</Typography>
+                <Typography fontSize={12} color={textSecondary} mt={0.2}>
+                  Shown in WhatsApp auto-reply when a customer sends an unrecognised message.
+                </Typography>
+              </Box>
+              <TextField size="small" type="tel"
+                placeholder="+91 XXXXX XXXXX"
+                value={s.vendor_phone ?? ""}
+                onChange={(e) => { setS((prev) => ({ ...prev, vendor_phone: e.target.value })); setSDirty(true); setSSaved(false) }}
+                sx={{ width: 175, "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }} />
+            </Box>
           </Paper>
 
           {/* Auto-generate Time */}

@@ -74,11 +74,25 @@ export default function Orders({ dark }) {
   const [tokenExpired, setTokenExpired] = useState(false)
   const [bulkLoading,  setBulkLoading]  = useState(false)
 
+  const fetchOrders = () => {
+    API.get(`/orders?token=${getToken()}`).then((res) => {
+      setOrders(res.data.orders)
+      const uniqueApts = [
+        ...new Set(res.data.orders.map((o) => o.apartment).filter(Boolean)),
+      ]
+      setApartments(uniqueApts)
+    }).catch((err) => {
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        setTokenExpired(true)
+      }
+    })
+  }
+
   const generate = async () => {
     setGenerating(true)
     try {
       await API.post(`/generate-orders?token=${getToken()}`)
-      window.location.reload()
+      fetchOrders()
     } finally {
       setGenerating(false)
     }
@@ -104,17 +118,7 @@ export default function Orders({ dark }) {
     API.get(`/settings?token=${getToken()}`).then((r) => {
       setShowPhone(r.data.show_phone_numbers !== false)
     }).catch(() => {})
-    API.get(`/orders?token=${getToken()}`).then((res) => {
-      setOrders(res.data.orders)
-      const uniqueApts = [
-        ...new Set(res.data.orders.map((o) => o.apartment).filter(Boolean)),
-      ]
-      setApartments(uniqueApts)
-    }).catch((err) => {
-      if (err.response?.status === 401 || err.response?.status === 403) {
-        setTokenExpired(true)
-      }
-    })
+    fetchOrders()
   }, [])
 
   /* ── FILTER ── */
@@ -290,7 +294,7 @@ export default function Orders({ dark }) {
               "&.Mui-disabled": { background: "#93c5fd", color: "white" },
             }}
           >
-            {generating ? "Generating…" : "Generate Today's Orders"}
+            {generating ? "Generating…" : "Generate Orders"}
           </Button>
         )}
       </Box>
@@ -563,6 +567,10 @@ export default function Orders({ dark }) {
         {filtered.map((o, i) => {
           const isLong     = (o.address || "").length > 45
           const isExpanded = !!expanded[o.order_id]
+          const items      = o.items || []
+          const hasItems   = items.length > 0
+          const orderTotal = items.reduce((sum, it) =>
+            sum + (it.quantity * (parseFloat(it.price_at_order) + parseFloat(it.delivery_charge_at_order || 0))), 0)
 
           return (
             <Box key={o.order_id}>
@@ -638,6 +646,57 @@ export default function Orders({ dark }) {
                       )}
                     </Box>
                   )}
+
+                  {/* ── ORDER ITEMS ── */}
+                  {hasItems && (
+                    <Box mt={1} display="flex" flexDirection="column" gap={0.5}>
+                      {items.map((it) => (
+                        <Box
+                          key={it.item_id}
+                          display="flex"
+                          alignItems="center"
+                          gap={0.8}
+                          sx={{
+                            px: 1, py: 0.4, borderRadius: "6px",
+                            background: it.order_type === "adhoc" ? "#fef9c3" : "#f0f9ff",
+                            border: `1px solid ${it.order_type === "adhoc" ? "#fde047" : "#bae6fd"}`,
+                          }}
+                        >
+                          <Typography fontSize={12} fontWeight={700} color="text.primary" sx={{ flex: 1 }}>
+                            {it.product_name}
+                            <Box component="span" fontWeight={400} color="text.secondary" ml={0.4}>
+                              {it.unit}
+                            </Box>
+                          </Typography>
+                          <Typography fontSize={12} fontWeight={600} color="text.secondary">
+                            ×{it.quantity}
+                          </Typography>
+                          <Typography fontSize={12} fontWeight={700} color="#1d4ed8">
+                            ₹{(it.quantity * parseFloat(it.price_at_order)).toFixed(0)}
+                            {parseFloat(it.delivery_charge_at_order) > 0 && (
+                              <Box component="span" fontWeight={400} color="text.secondary" fontSize={10.5}>
+                                {" "}+₹{(it.quantity * parseFloat(it.delivery_charge_at_order)).toFixed(0)} del
+                              </Box>
+                            )}
+                          </Typography>
+                          <Chip
+                            label={it.order_type === "adhoc" ? "Adhoc" : "Sub"}
+                            size="small"
+                            sx={{
+                              height: 16, fontSize: 10, fontWeight: 700,
+                              background: it.order_type === "adhoc" ? "#fbbf24" : "#38bdf8",
+                              color: "white", px: 0.2,
+                            }}
+                          />
+                        </Box>
+                      ))}
+                      {items.length > 1 && (
+                        <Typography fontSize={11.5} fontWeight={700} color="#1d4ed8" textAlign="right" mt={0.2}>
+                          Total: ₹{orderTotal.toFixed(0)}
+                        </Typography>
+                      )}
+                    </Box>
+                  )}
                 </Box>
 
                 {/* RIGHT */}
@@ -648,12 +707,14 @@ export default function Orders({ dark }) {
                   gap={0.8}
                   flexShrink={0}
                 >
-                  <Chip
-                    label={`Qty: ${o.quantity}`}
-                    size="small"
-                    color="primary"
-                    sx={{ fontWeight: 600, fontSize: 12 }}
-                  />
+                  {!hasItems && (
+                    <Chip
+                      label={`Qty: ${o.quantity}`}
+                      size="small"
+                      color="primary"
+                      sx={{ fontWeight: 600, fontSize: 12 }}
+                    />
+                  )}
 
                   <Box display="flex" alignItems="center" gap={0.8}>
                     <Switch

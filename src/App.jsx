@@ -5,11 +5,13 @@ import { Snackbar, Alert } from "@mui/material"
 import Sidebar from "./dashboard/layout/Sidebar"
 import Header from "./dashboard/layout/Header"
 
-import Orders from "./dashboard/pages/Orders"
+import Orders    from "./dashboard/pages/Orders"
 import Apartments from "./dashboard/pages/Apartments"
-import Settings from "./dashboard/pages/Settings"
-import Customers from "./dashboard/pages/Customers"
-import Pauses    from "./dashboard/pages/Pauses"
+import Settings   from "./dashboard/pages/Settings"
+import Customers  from "./dashboard/pages/Customers"
+import Pauses     from "./dashboard/pages/Pauses"
+import Products   from "./dashboard/pages/Products"
+import Messages   from "./dashboard/pages/Messages"
 
 import HomePage from "./company/HomePage"
 import AboutPage from "./company/AboutPage"
@@ -50,6 +52,8 @@ function VendorDashboard() {
       if(page==="settings")   return <Settings dark={dark}/>
       if(page==="customers")  return <Customers dark={dark}/>
       if(page==="pauses")     return <Pauses dark={dark}/>
+      if(page==="products")   return <Products dark={dark}/>
+      if(page==="messages")   return <Messages dark={dark}/>
     }
     // delivery role falls back to orders for any other page
     return <Orders dark={dark}/>

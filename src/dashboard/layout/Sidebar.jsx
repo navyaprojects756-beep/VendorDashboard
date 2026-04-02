@@ -10,13 +10,17 @@ import LocalDrinkIcon    from "@mui/icons-material/LocalDrink"
 import ChevronRightIcon  from "@mui/icons-material/ChevronRight"
 import PeopleIcon        from "@mui/icons-material/People"
 import PauseCircleIcon   from "@mui/icons-material/PauseCircle"
+import InventoryIcon     from "@mui/icons-material/Inventory"
+import MessageIcon       from "@mui/icons-material/Message"
 
 const ALL_MENU = [
-  { key: "orders",     label: "Orders",            icon: <DashboardIcon fontSize="small" />,  roles: ["admin","delivery"] },
-  { key: "customers",  label: "Customers",         icon: <PeopleIcon fontSize="small" />,     roles: ["admin"] },
-  { key: "pauses",     label: "Pauses",            icon: <PauseCircleIcon fontSize="small" />,roles: ["admin"] },
-  { key: "apartments", label: "Apartments & Blocks",icon: <ApartmentIcon fontSize="small" />, roles: ["admin"] },
-  { key: "settings",   label: "Settings",          icon: <SettingsIcon fontSize="small" />,   roles: ["admin"] },
+  { key: "orders",     label: "Orders",             icon: <DashboardIcon fontSize="small" />,  roles: ["admin","delivery"] },
+  { key: "customers",  label: "Customers",          icon: <PeopleIcon fontSize="small" />,     roles: ["admin"] },
+  { key: "products",   label: "Products",           icon: <InventoryIcon fontSize="small" />,  roles: ["admin"] },
+  { key: "messages",   label: "Messages",           icon: <MessageIcon fontSize="small" />,    roles: ["admin"] },
+  { key: "pauses",     label: "Pauses",             icon: <PauseCircleIcon fontSize="small" />,roles: ["admin"] },
+  { key: "apartments", label: "Apartments & Blocks", icon: <ApartmentIcon fontSize="small" />, roles: ["admin"] },
+  { key: "settings",   label: "Settings",           icon: <SettingsIcon fontSize="small" />,   roles: ["admin"] },
 ]
 
 export default function Sidebar({ open, setOpen, page, setPage, dark, role = "admin" }) {
