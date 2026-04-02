@@ -233,6 +233,21 @@ export default function Orders({ dark }) {
   const delivered = filtered.filter((o) => o.is_delivered).length
   const pending   = filtered.length - delivered
 
+  /* ── PRODUCT SUMMARY — aggregate qty per product across filtered orders ── */
+  const productSummary = (() => {
+    const map = {}
+    for (const o of filtered) {
+      for (const it of (o.items || [])) {
+        if (!map[it.product_name]) {
+          map[it.product_name] = { name: it.product_name, unit: it.unit, sub: 0, adhoc: 0 }
+        }
+        if (it.order_type === "adhoc") map[it.product_name].adhoc += it.quantity
+        else                           map[it.product_name].sub   += it.quantity
+      }
+    }
+    return Object.values(map).sort((a, b) => a.name.localeCompare(b.name))
+  })()
+
   /* ── LABEL for count row ── */
   const dateLabel =
     dateMode === "today"     ? "Today"      :
@@ -440,6 +455,89 @@ export default function Orders({ dark }) {
           </Paper>
         </Grid>
       </Grid>
+
+      {/* ══ PRODUCT SUMMARY TILES ══ */}
+      {productSummary.length > 0 && (
+        <Paper
+          elevation={0}
+          sx={{ p: 1.5, mb: 2, borderRadius: 3, border: "1px solid #e5e7eb" }}
+        >
+          <Typography fontSize={11} fontWeight={700} letterSpacing="0.6px"
+            color="text.secondary" mb={1}>
+            PRODUCT TOTALS — {dateLabel.toUpperCase()}
+          </Typography>
+          <Box display="flex" flexWrap="wrap" gap={1}>
+            {productSummary.map((p) => (
+              <Box
+                key={p.name}
+                sx={{
+                  borderRadius: "10px",
+                  border: "1px solid #e5e7eb",
+                  overflow: "hidden",
+                  minWidth: 120,
+                  flex: "1 1 120px",
+                  maxWidth: 200,
+                }}
+              >
+                {/* Product name header */}
+                <Box sx={{ px: 1.2, py: 0.7, background: "#f8fafc", borderBottom: "1px solid #e5e7eb" }}>
+                  <Typography fontSize={12.5} fontWeight={700} color="text.primary" noWrap>
+                    {p.name}
+                  </Typography>
+                  {p.unit && (
+                    <Typography fontSize={10.5} color="text.secondary">{p.unit}</Typography>
+                  )}
+                </Box>
+
+                {/* Subscription row */}
+                {p.sub > 0 && (
+                  <Box
+                    display="flex" justifyContent="space-between" alignItems="center"
+                    sx={{ px: 1.2, py: 0.5, background: "#eff6ff" }}
+                  >
+                    <Typography fontSize={11} fontWeight={600} color="#1d4ed8">
+                      📦 Sub
+                    </Typography>
+                    <Typography fontSize={14} fontWeight={800} color="#1d4ed8">
+                      {p.sub}
+                    </Typography>
+                  </Box>
+                )}
+
+                {/* Adhoc row */}
+                {p.adhoc > 0 && (
+                  <Box
+                    display="flex" justifyContent="space-between" alignItems="center"
+                    sx={{ px: 1.2, py: 0.5, background: "#fefce8" }}
+                  >
+                    <Typography fontSize={11} fontWeight={600} color="#a16207">
+                      ⚡ Adhoc
+                    </Typography>
+                    <Typography fontSize={14} fontWeight={800} color="#a16207">
+                      {p.adhoc}
+                    </Typography>
+                  </Box>
+                )}
+
+                {/* Total if both exist */}
+                {p.sub > 0 && p.adhoc > 0 && (
+                  <Box
+                    display="flex" justifyContent="space-between" alignItems="center"
+                    sx={{ px: 1.2, py: 0.5, background: "#f1f5f9", borderTop: "1px solid #e5e7eb" }}
+                  >
+                    <Typography fontSize={11} fontWeight={600} color="text.secondary">
+                      Total
+                    </Typography>
+                    <Typography fontSize={14} fontWeight={800} color="text.primary">
+                      {p.sub + p.adhoc}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            ))}
+          </Box>
+        </Paper>
+      )}
 
       {/* ══ COMPACT FILTER ROW ══ */}
       <Paper

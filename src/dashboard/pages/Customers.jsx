@@ -431,84 +431,168 @@ export default function Customers({ dark }) {
 
           {!invLoading && invoiceData && (() => {
             const { orders, price_per_unit } = invoiceData
-            const delivered = orders.filter((o) => o.is_delivered)
-            const rate      = Number(price_per_unit)
-            const totalQty  = delivered.reduce((s, o) => s + o.quantity, 0)
-            const totalAmt  = delivered.reduce((s, o) => s + o.quantity * rate, 0)
+            const delivered  = orders.filter((o) => o.is_delivered)
+            const rate       = Number(price_per_unit)
+            const hasItems   = delivered.some(o => o.items && o.items.length > 0)
+
+            // Compute totals
+            let totalAmt = 0
+            if (hasItems) {
+              for (const o of delivered)
+                for (const it of (o.items || []))
+                  totalAmt += it.quantity * (parseFloat(it.price_at_order) + parseFloat(it.delivery_charge_at_order || 0))
+            } else {
+              totalAmt = delivered.reduce((s, o) => s + o.quantity * rate, 0)
+            }
+
+            const unpaidDelivered = delivered.filter(o => o.payment_status !== "paid")
+            let unpaidAmt = 0
+            if (hasItems) {
+              for (const o of unpaidDelivered)
+                for (const it of (o.items || []))
+                  unpaidAmt += it.quantity * (parseFloat(it.price_at_order) + parseFloat(it.delivery_charge_at_order || 0))
+            } else {
+              unpaidAmt = unpaidDelivered.reduce((s, o) => s + o.quantity * rate, 0)
+            }
+
+            const headerCell = { fontWeight: 700, fontSize: 11, color: "white", borderColor: "#1d4ed8", py: 1, px: 1, background: "#2563eb" }
+            const cell = (extra={}) => ({ fontSize: 12, color: textPrimary, borderColor: border, py: 0.8, px: 1, ...extra })
+
             return (
               <>
-                <Box display="flex" gap={1.5} flexWrap="wrap" mb={2}>
+                {/* ── Summary chips ── */}
+                <Box display="flex" gap={1} flexWrap="wrap" mb={2}>
                   {[
                     { label: `${delivered.length} deliveries`, color: "#2563eb", bg: dark ? "#1e3a5f" : "#eff6ff" },
-                    { label: `${totalQty} packets`,            color: "#7c3aed", bg: dark ? "#2e1065" : "#faf5ff" },
                     { label: `₹${totalAmt.toFixed(2)} total`,  color: "#16a34a", bg: dark ? "#14532d" : "#f0fdf4" },
-                    { label: `₹${rate.toFixed(2)} / packet`,   color: "#f97316", bg: dark ? "#431407" : "#fff7ed" },
+                    unpaidAmt > 0
+                      ? { label: `₹${unpaidAmt.toFixed(2)} due`, color: "#dc2626", bg: dark ? "#450a0a" : "#fee2e2" }
+                      : { label: "Fully Paid ✓",                 color: "#16a34a", bg: dark ? "#14532d" : "#f0fdf4" },
                   ].map((s) => (
                     <Box key={s.label} sx={{ px: 1.5, py: 0.5, borderRadius: 2, background: s.bg }}>
                       <Typography fontSize={12} fontWeight={700} color={s.color}>{s.label}</Typography>
                     </Box>
                   ))}
                 </Box>
+
                 {delivered.length === 0 ? (
                   <Box py={4} textAlign="center">
                     <Typography color={textSecondary} fontSize={13}>No delivered orders in this period.</Typography>
                   </Box>
-                ) : (() => {
-                  const paidRows   = delivered.filter(o => o.payment_status === "paid")
-                  const unpaidRows = delivered.filter(o => o.payment_status !== "paid")
-                  const unpaidAmt  = unpaidRows.reduce((s, o) => s + o.quantity * rate, 0)
-                  return (
-                    <Box sx={{ overflowX: "auto" }}>
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow sx={{ background: bgCard }}>
-                            {["#", "Date", "Packets", "Rate", "Amount", "Status"].map((h) => (
-                              <TableCell key={h} sx={{ fontWeight: 700, fontSize: 11.5, color: textSecondary, borderColor: border }}>{h}</TableCell>
-                            ))}
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {delivered.map((o, i) => {
-                            const isPaid = o.payment_status === "paid"
-                            return (
-                              <TableRow key={i} sx={{ background: isPaid ? (dark ? "#0f2d1a" : "#f0fdf4") : "inherit", "&:hover": { background: bgCard } }}>
-                                <TableCell sx={{ fontSize: 12, color: textSecondary, borderColor: border }}>{i + 1}</TableCell>
-                                <TableCell sx={{ fontSize: 12, fontWeight: 600, color: textPrimary, borderColor: border }}>{fmtDate(String(o.order_date).slice(0, 10))}</TableCell>
-                                <TableCell sx={{ fontSize: 12, color: textPrimary, borderColor: border }}>{o.quantity}</TableCell>
-                                <TableCell sx={{ fontSize: 12, color: textSecondary, borderColor: border }}>₹{rate.toFixed(2)}</TableCell>
-                                <TableCell sx={{ fontSize: 12, fontWeight: 700, color: isPaid ? "#16a34a" : "#2563eb", borderColor: border }}>₹{(o.quantity * rate).toFixed(2)}</TableCell>
-                                <TableCell sx={{ borderColor: border }}>
-                                  <Chip label={isPaid ? "Paid" : "Unpaid"} size="small"
-                                    sx={{ fontSize: 10, fontWeight: 700, height: 18,
-                                      background: isPaid ? (dark ? "#14532d" : "#dcfce7") : (dark ? "#450a0a" : "#fee2e2"),
-                                      color: isPaid ? "#16a34a" : "#dc2626" }} />
-                                </TableCell>
-                              </TableRow>
-                            )
-                          })}
-                          {/* Totals row */}
-                          <TableRow sx={{ background: bgCard }}>
-                            <TableCell colSpan={2} sx={{ fontWeight: 700, fontSize: 13, color: textPrimary, borderColor: border }}>Total</TableCell>
-                            <TableCell sx={{ fontWeight: 700, fontSize: 13, color: textPrimary, borderColor: border }}>{totalQty}</TableCell>
-                            <TableCell sx={{ borderColor: border }} />
-                            <TableCell sx={{ fontWeight: 800, fontSize: 13, color: "#16a34a", borderColor: border }}>₹{totalAmt.toFixed(2)}</TableCell>
-                            <TableCell sx={{ borderColor: border }} />
-                          </TableRow>
-                          {/* Outstanding row — only if some unpaid */}
-                          {unpaidRows.length > 0 && paidRows.length > 0 && (
-                            <TableRow sx={{ background: dark ? "#2d0a0a" : "#fff5f5" }}>
-                              <TableCell colSpan={2} sx={{ fontWeight: 700, fontSize: 12, color: "#dc2626", borderColor: border }}>Outstanding</TableCell>
-                              <TableCell sx={{ fontWeight: 700, fontSize: 12, color: "#dc2626", borderColor: border }}>{unpaidRows.reduce((s,o)=>s+o.quantity,0)}</TableCell>
-                              <TableCell sx={{ borderColor: border }} />
-                              <TableCell sx={{ fontWeight: 800, fontSize: 12, color: "#dc2626", borderColor: border }}>₹{unpaidAmt.toFixed(2)}</TableCell>
-                              <TableCell sx={{ borderColor: border }} />
-                            </TableRow>
+                ) : (
+                  <Box sx={{ overflowX: "auto" }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={headerCell}>Date</TableCell>
+                          {hasItems ? (
+                            <>
+                              <TableCell sx={headerCell}>Product</TableCell>
+                              <TableCell sx={{ ...headerCell, textAlign: "center" }}>Type</TableCell>
+                              <TableCell sx={{ ...headerCell, textAlign: "center" }}>Qty</TableCell>
+                              <TableCell sx={{ ...headerCell, textAlign: "right" }}>Price</TableCell>
+                              <TableCell sx={{ ...headerCell, textAlign: "right" }}>Del.</TableCell>
+                              <TableCell sx={{ ...headerCell, textAlign: "right" }}>Amount</TableCell>
+                            </>
+                          ) : (
+                            <>
+                              <TableCell sx={{ ...headerCell, textAlign: "center" }}>Qty</TableCell>
+                              <TableCell sx={{ ...headerCell, textAlign: "right" }}>Rate</TableCell>
+                              <TableCell sx={{ ...headerCell, textAlign: "right" }}>Amount</TableCell>
+                            </>
                           )}
-                        </TableBody>
-                      </Table>
-                    </Box>
-                  )
-                })()}
+                          <TableCell sx={headerCell}>Status</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {delivered.map((o, oi) => {
+                          const isPaid   = o.payment_status === "paid"
+                          const items    = o.items || []
+                          const rowBg    = isPaid ? (dark ? "#0a1f0f" : "#f0fdf4") : "inherit"
+                          const dateStr  = fmtDate(String(o.order_date).slice(0, 10))
+
+                          if (hasItems && items.length > 0) {
+                            return items.map((it, ii) => {
+                              const isAdhoc = it.order_type === "adhoc"
+                              const amt     = it.quantity * (parseFloat(it.price_at_order) + parseFloat(it.delivery_charge_at_order || 0))
+                              const dc      = parseFloat(it.delivery_charge_at_order || 0)
+                              return (
+                                <TableRow key={`${oi}-${ii}`} sx={{ background: isAdhoc ? (dark ? "#1c1500" : "#fefce8") : rowBg, "&:hover": { filter: "brightness(0.97)" } }}>
+                                  <TableCell sx={cell({ fontWeight: 600 })}>{ii === 0 ? dateStr : ""}</TableCell>
+                                  <TableCell sx={cell()}>
+                                    {it.product_name}
+                                    {it.unit && <Box component="span" fontSize={10} color={textSecondary} ml={0.4}>({it.unit})</Box>}
+                                  </TableCell>
+                                  <TableCell sx={cell({ textAlign: "center" })}>
+                                    <Chip label={isAdhoc ? "Adhoc" : "Sub"} size="small"
+                                      sx={{ fontSize: 9, fontWeight: 700, height: 16, px: 0.2,
+                                        background: isAdhoc ? "#fbbf24" : "#bae6fd",
+                                        color: isAdhoc ? "#78350f" : "#0369a1" }} />
+                                  </TableCell>
+                                  <TableCell sx={cell({ textAlign: "center", fontWeight: 600 })}>{it.quantity}</TableCell>
+                                  <TableCell sx={cell({ textAlign: "right", color: textSecondary })}>₹{parseFloat(it.price_at_order).toFixed(2)}</TableCell>
+                                  <TableCell sx={cell({ textAlign: "right", color: textSecondary })}>{dc > 0 ? `₹${dc.toFixed(2)}` : "—"}</TableCell>
+                                  <TableCell sx={cell({ textAlign: "right", fontWeight: 700, color: "#2563eb" })}>₹{amt.toFixed(2)}</TableCell>
+                                  <TableCell sx={cell()}>
+                                    {ii === 0 && (
+                                      <Chip label={isPaid ? "Paid" : "Unpaid"} size="small"
+                                        sx={{ fontSize: 10, fontWeight: 700, height: 18,
+                                          background: isPaid ? (dark ? "#14532d" : "#dcfce7") : (dark ? "#450a0a" : "#fee2e2"),
+                                          color: isPaid ? "#16a34a" : "#dc2626" }} />
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            })
+                          }
+
+                          // Legacy row (no items)
+                          const amt = o.quantity * rate
+                          return (
+                            <TableRow key={oi} sx={{ background: rowBg, "&:hover": { background: bgCard } }}>
+                              <TableCell sx={cell({ fontWeight: 600 })}>{dateStr}</TableCell>
+                              <TableCell sx={cell({ textAlign: "center" })}>{o.quantity}</TableCell>
+                              <TableCell sx={cell({ textAlign: "right", color: textSecondary })}>₹{rate.toFixed(2)}</TableCell>
+                              <TableCell sx={cell({ textAlign: "right", fontWeight: 700, color: "#2563eb" })}>₹{amt.toFixed(2)}</TableCell>
+                              <TableCell sx={cell()}>
+                                <Chip label={isPaid ? "Paid" : "Unpaid"} size="small"
+                                  sx={{ fontSize: 10, fontWeight: 700, height: 18,
+                                    background: isPaid ? (dark ? "#14532d" : "#dcfce7") : (dark ? "#450a0a" : "#fee2e2"),
+                                    color: isPaid ? "#16a34a" : "#dc2626" }} />
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+
+                        {/* Total row */}
+                        <TableRow sx={{ background: dark ? "#1e293b" : "#f8fafc", borderTop: "2px solid #2563eb" }}>
+                          <TableCell colSpan={hasItems ? 6 : 3}
+                            sx={{ fontWeight: 800, fontSize: 13, color: textPrimary, borderColor: border, py: 1, px: 1 }}>
+                            Total
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 800, fontSize: 14, color: "#16a34a", borderColor: border, textAlign: "right", py: 1, px: 1 }}>
+                            ₹{totalAmt.toFixed(2)}
+                          </TableCell>
+                          <TableCell sx={{ borderColor: border }} />
+                        </TableRow>
+
+                        {/* Outstanding row */}
+                        {unpaidAmt > 0 && unpaidAmt < totalAmt && (
+                          <TableRow sx={{ background: dark ? "#2d0a0a" : "#fff5f5" }}>
+                            <TableCell colSpan={hasItems ? 6 : 3}
+                              sx={{ fontWeight: 700, fontSize: 12, color: "#dc2626", borderColor: border, py: 0.8, px: 1 }}>
+                              Outstanding (Unpaid)
+                            </TableCell>
+                            <TableCell sx={{ fontWeight: 800, fontSize: 13, color: "#dc2626", borderColor: border, textAlign: "right", py: 0.8, px: 1 }}>
+                              ₹{unpaidAmt.toFixed(2)}
+                            </TableCell>
+                            <TableCell sx={{ borderColor: border }} />
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </Box>
+                )}
               </>
             )
           })()}
