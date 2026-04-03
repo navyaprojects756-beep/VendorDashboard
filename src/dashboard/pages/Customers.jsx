@@ -50,6 +50,20 @@ const getLastMonth = () => {
 const fmtDate = (str) =>
   new Date(str).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
 
+const toNum = (value) => Number.parseFloat(value || 0) || 0
+const getOrderDelivery = (order) => {
+  const direct = toNum(order?.delivery_charge_amount)
+  if (direct > 0) return direct
+  return (order?.items || []).reduce((sum, item) => sum + toNum(item.delivery_charge_at_order), 0)
+}
+const getOrderTotal = (order, rate) => {
+  const items = order?.items || []
+  const itemTotal = items.length > 0
+    ? items.reduce((sum, item) => sum + (toNum(item.quantity) * toNum(item.price_at_order)), 0)
+    : (toNum(order?.quantity) * toNum(rate))
+  return itemTotal + getOrderDelivery(order)
+}
+
 /* ═══════════════════════════════════════════
    MAIN
 ═══════════════════════════════════════════ */
@@ -436,24 +450,10 @@ export default function Customers({ dark }) {
             const hasItems   = delivered.some(o => o.items && o.items.length > 0)
 
             // Compute totals
-            let totalAmt = 0
-            if (hasItems) {
-              for (const o of delivered)
-                for (const it of (o.items || []))
-                  totalAmt += it.quantity * (parseFloat(it.price_at_order) + parseFloat(it.delivery_charge_at_order || 0))
-            } else {
-              totalAmt = delivered.reduce((s, o) => s + o.quantity * rate, 0)
-            }
+            const totalAmt = delivered.reduce((sum, o) => sum + getOrderTotal(o, rate), 0)
 
             const unpaidDelivered = delivered.filter(o => o.payment_status !== "paid")
-            let unpaidAmt = 0
-            if (hasItems) {
-              for (const o of unpaidDelivered)
-                for (const it of (o.items || []))
-                  unpaidAmt += it.quantity * (parseFloat(it.price_at_order) + parseFloat(it.delivery_charge_at_order || 0))
-            } else {
-              unpaidAmt = unpaidDelivered.reduce((s, o) => s + o.quantity * rate, 0)
-            }
+            const unpaidAmt = unpaidDelivered.reduce((sum, o) => sum + getOrderTotal(o, rate), 0)
 
             const headerCell = { fontWeight: 700, fontSize: 11, color: "white", borderColor: "#1d4ed8", py: 1, px: 1, background: "#2563eb" }
             const cell = (extra={}) => ({ fontSize: 12, color: textPrimary, borderColor: border, py: 0.8, px: 1, ...extra })
@@ -514,8 +514,8 @@ export default function Customers({ dark }) {
                           if (hasItems && items.length > 0) {
                             return items.map((it, ii) => {
                               const isAdhoc = it.order_type === "adhoc"
-                              const amt     = it.quantity * (parseFloat(it.price_at_order) + parseFloat(it.delivery_charge_at_order || 0))
-                              const dc      = parseFloat(it.delivery_charge_at_order || 0)
+                              const dc      = ii === 0 ? getOrderDelivery(o) : 0
+                              const amt     = (it.quantity * parseFloat(it.price_at_order)) + dc
                               return (
                                 <TableRow key={`${oi}-${ii}`} sx={{ background: isAdhoc ? (dark ? "#1c1500" : "#fefce8") : rowBg, "&:hover": { filter: "brightness(0.97)" } }}>
                                   <TableCell sx={cell({ fontWeight: 600 })}>{ii === 0 ? dateStr : ""}</TableCell>
@@ -547,7 +547,7 @@ export default function Customers({ dark }) {
                           }
 
                           // Legacy row (no items)
-                          const amt = o.quantity * rate
+                          const amt = getOrderTotal(o, rate)
                           return (
                             <TableRow key={oi} sx={{ background: rowBg, "&:hover": { background: bgCard } }}>
                               <TableCell sx={cell({ fontWeight: 600 })}>{dateStr}</TableCell>

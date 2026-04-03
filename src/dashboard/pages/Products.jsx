@@ -11,7 +11,6 @@ import EditIcon          from "@mui/icons-material/Edit"
 import DeleteIcon        from "@mui/icons-material/Delete"
 import HistoryIcon       from "@mui/icons-material/History"
 import InventoryIcon     from "@mui/icons-material/Inventory"
-import LocalShippingIcon from "@mui/icons-material/LocalShipping"
 
 const ORDER_TYPE_LABELS = {
   subscription: "Daily",
@@ -65,7 +64,7 @@ export default function Products({ dark }) {
       name:            p.name,
       unit:            p.unit || "",
       price:           String(p.price),
-      delivery_charge: String(p.delivery_charge),
+      delivery_charge: "0",
       order_type:      p.order_type,
       sort_order:      String(p.sort_order),
     })
@@ -80,7 +79,7 @@ export default function Products({ dark }) {
         name:            form.name.trim(),
         unit:            form.unit.trim(),
         price:           parseFloat(form.price),
-        delivery_charge: parseFloat(form.delivery_charge || 0),
+        delivery_charge: 0,
         order_type:      form.order_type,
         sort_order:      parseInt(form.sort_order || 0),
         is_active:       editing ? editing.is_active : true,
@@ -199,14 +198,6 @@ export default function Products({ dark }) {
                     <Typography fontSize={13} fontWeight={700} color="#2563eb">
                       ₹{parseFloat(p.price).toFixed(2)}
                     </Typography>
-                    {parseFloat(p.delivery_charge) > 0 && (
-                      <Box display="flex" alignItems="center" gap={0.3}>
-                        <LocalShippingIcon sx={{ fontSize: 13, color: "text.disabled" }} />
-                        <Typography fontSize={12} color="text.secondary">
-                          +₹{parseFloat(p.delivery_charge).toFixed(2)} delivery
-                        </Typography>
-                      </Box>
-                    )}
                   </Box>
                 </Box>
 
@@ -265,26 +256,15 @@ export default function Products({ dark }) {
             value={form.unit}
             onChange={e => setForm(f => ({ ...f, unit: e.target.value }))}
           />
-          <Box display="flex" gap={1.5}>
-            <TextField
-              label="Price (₹) *"
-              size="small"
-              type="number"
-              inputProps={{ min: 0, step: "0.01" }}
-              value={form.price}
-              onChange={e => setForm(f => ({ ...f, price: e.target.value }))}
-              sx={{ flex: 1 }}
-            />
-            <TextField
-              label="Delivery Charge (₹)"
-              size="small"
-              type="number"
-              inputProps={{ min: 0, step: "0.01" }}
-              value={form.delivery_charge}
-              onChange={e => setForm(f => ({ ...f, delivery_charge: e.target.value }))}
-              sx={{ flex: 1 }}
-            />
-          </Box>
+          <TextField
+            label="Price (₹) *"
+            size="small"
+            type="number"
+            inputProps={{ min: 0, step: "0.01" }}
+            value={form.price}
+            onChange={e => setForm(f => ({ ...f, price: e.target.value }))}
+            fullWidth
+          />
           <Box display="flex" gap={1.5}>
             <FormControl size="small" sx={{ flex: 1 }}>
               <InputLabel>Order Type</InputLabel>
@@ -352,9 +332,6 @@ export default function Products({ dark }) {
                 py={0.8} borderBottom={i < histData.length - 1 ? "1px solid #f3f4f6" : "none"}>
                 <Box>
                   <Typography fontSize={14} fontWeight={600} color="#2563eb">₹{parseFloat(h.price).toFixed(2)}</Typography>
-                  {parseFloat(h.delivery_charge) > 0 && (
-                    <Typography fontSize={11} color="text.secondary">+₹{parseFloat(h.delivery_charge).toFixed(2)} delivery</Typography>
-                  )}
                 </Box>
                 <Typography fontSize={12} color="text.secondary">from {fmtDate(h.effective_from)}</Typography>
               </Box>

@@ -51,6 +51,13 @@ const isSameDay = (orderDate, targetStr) => {
   return String(orderDate).slice(0, 10) === targetStr
 }
 
+const toNum = (value) => Number.parseFloat(value || 0) || 0
+const getOrderDelivery = (order) => {
+  const direct = toNum(order?.delivery_charge_amount)
+  if (direct > 0) return direct
+  return (order?.items || []).reduce((sum, item) => sum + toNum(item.delivery_charge_at_order), 0)
+}
+
 /* ─────────────────────────────────────── */
 
 /* ── token expiry helper ── */
@@ -667,8 +674,9 @@ export default function Orders({ dark }) {
           const isExpanded = !!expanded[o.order_id]
           const items      = o.items || []
           const hasItems   = items.length > 0
+          const orderDelivery = getOrderDelivery(o)
           const orderTotal = items.reduce((sum, it) =>
-            sum + (it.quantity * (parseFloat(it.price_at_order) + parseFloat(it.delivery_charge_at_order || 0))), 0)
+            sum + (it.quantity * parseFloat(it.price_at_order)), 0) + orderDelivery
 
           return (
             <Box key={o.order_id}>
@@ -771,9 +779,9 @@ export default function Orders({ dark }) {
                           </Typography>
                           <Typography fontSize={12} fontWeight={700} color="#1d4ed8">
                             ₹{(it.quantity * parseFloat(it.price_at_order)).toFixed(0)}
-                            {parseFloat(it.delivery_charge_at_order) > 0 && (
+                            {orderDelivery > 0 && it === items[0] && (
                               <Box component="span" fontWeight={400} color="text.secondary" fontSize={10.5}>
-                                {" "}+₹{(it.quantity * parseFloat(it.delivery_charge_at_order)).toFixed(0)} del
+                                {" "}+₹{orderDelivery.toFixed(0)} del
                               </Box>
                             )}
                           </Typography>

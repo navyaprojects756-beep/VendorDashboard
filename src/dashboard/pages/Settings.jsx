@@ -508,11 +508,21 @@ export default function Settings({ dark }) {
                 sx={{ width: 110, "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 15, fontWeight: 700 } }} />
             </Box>
             <Divider />
+            <SettingRow
+              icon={<LocalDrinkIcon sx={{ fontSize: 17 }} />}
+              label="Apply Delivery Charge To Subscription Orders"
+              desc="Turn this on if daily subscription-only orders should also get the per-order delivery charge. Turn it off to charge delivery only when a quick order exists."
+              checked={!!s.apply_delivery_charge_on_subscription}
+              onChange={() => toggleS("apply_delivery_charge_on_subscription")}
+              color="#16a34a"
+              dark={dark}
+            />
+            <Divider />
             <Box sx={{ px: 2.5, py: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
               <Box flex={1}>
-                <Typography fontWeight={600} fontSize={13.5} color={textPrimary}>Quick Order Delivery Charge (₹)</Typography>
+                <Typography fontWeight={600} fontSize={13.5} color={textPrimary}>Delivery Charge Per Order (₹)</Typography>
                 <Typography fontSize={12} color={textSecondary} mt={0.2}>
-                  Charged once per quick / one-time order. Set to 0 for free delivery.
+                  Charged only once per order. If subscription items and quick-order items are delivered together, this is still applied just one time.
                 </Typography>
               </Box>
               <TextField size="small" type="number"
