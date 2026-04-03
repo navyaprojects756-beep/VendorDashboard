@@ -235,6 +235,16 @@ export default function Orders({ dark }) {
   /* ── EXPAND ADDRESS ── */
   const toggleExpand = (id) =>
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }))
+  const expandAllRows = () => {
+    const next = {}
+    filtered.forEach((o) => { next[o.order_id] = true })
+    setExpanded(next)
+  }
+  const collapseAllRows = () => {
+    const next = {}
+    filtered.forEach((o) => { next[o.order_id] = false })
+    setExpanded(next)
+  }
 
   /* ── STATS ── */
   const delivered = filtered.filter((o) => o.is_delivered).length
@@ -496,14 +506,14 @@ export default function Orders({ dark }) {
                   )}
                 </Box>
 
-                {/* Subscription row */}
+                {/* Dailyscription row */}
                 {p.sub > 0 && (
                   <Box
                     display="flex" justifyContent="space-between" alignItems="center"
                     sx={{ px: 1.2, py: 0.5, background: "#eff6ff" }}
                   >
                     <Typography fontSize={11} fontWeight={600} color="#1d4ed8">
-                      📦 Sub
+                      📦 Daily
                     </Typography>
                     <Typography fontSize={14} fontWeight={800} color="#1d4ed8">
                       {p.sub}
@@ -511,14 +521,14 @@ export default function Orders({ dark }) {
                   </Box>
                 )}
 
-                {/* Adhoc row */}
+                {/* Tomorrow row */}
                 {p.adhoc > 0 && (
                   <Box
                     display="flex" justifyContent="space-between" alignItems="center"
                     sx={{ px: 1.2, py: 0.5, background: "#fefce8" }}
                   >
                     <Typography fontSize={11} fontWeight={600} color="#a16207">
-                      ⚡ Adhoc
+                      ⚡ Tomorrow
                     </Typography>
                     <Typography fontSize={14} fontWeight={800} color="#a16207">
                       {p.adhoc}
@@ -622,7 +632,31 @@ export default function Orders({ dark }) {
         </Typography>
 
         {filtered.length > 0 && (
-          <Box display="flex" gap={1}>
+          <Box display="flex" gap={1} flexWrap="wrap">
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={expandAllRows}
+              sx={{
+                textTransform: "none", fontWeight: 600, fontSize: 12,
+                borderRadius: "8px", borderColor: "#cbd5e1", color: "#334155",
+                "&:hover": { borderColor: "#94a3b8", background: "#f8fafc" },
+              }}
+            >
+              Expand All
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={collapseAllRows}
+              sx={{
+                textTransform: "none", fontWeight: 600, fontSize: 12,
+                borderRadius: "8px", borderColor: "#cbd5e1", color: "#334155",
+                "&:hover": { borderColor: "#94a3b8", background: "#f8fafc" },
+              }}
+            >
+              Collapse All
+            </Button>
             <Button
               size="small"
               variant="outlined"
@@ -674,6 +708,7 @@ export default function Orders({ dark }) {
           const isExpanded = !!expanded[o.order_id]
           const items      = o.items || []
           const hasItems   = items.length > 0
+          const canToggle  = hasItems || isLong
           const orderDelivery = getOrderDelivery(o)
           const orderTotal = items.reduce((sum, it) =>
             sum + (it.quantity * parseFloat(it.price_at_order)), 0) + orderDelivery
@@ -704,8 +739,8 @@ export default function Orders({ dark }) {
                       display="flex"
                       alignItems="flex-start"
                       gap={0.3}
-                      sx={{ cursor: isLong ? "pointer" : "default" }}
-                      onClick={() => isLong && toggleExpand(o.order_id)}
+                      sx={{ cursor: canToggle ? "pointer" : "default" }}
+                      onClick={() => canToggle && toggleExpand(o.order_id)}
                     >
                       <Typography
                         fontSize={12.5}
@@ -732,7 +767,7 @@ export default function Orders({ dark }) {
                         })()}
                       </Typography>
 
-                      {isLong && (
+                      {canToggle && (
                         <Tooltip title={isExpanded ? "Collapse" : "Expand"}>
                           <IconButton
                             size="small"
@@ -754,7 +789,30 @@ export default function Orders({ dark }) {
                   )}
 
                   {/* ── ORDER ITEMS ── */}
-                  {hasItems && (
+                  {hasItems && !isExpanded && (
+                    <Box mt={0.9} display="flex" alignItems="center" justifyContent="space-between" gap={1}>
+                      <Typography fontSize={12} color="text.secondary">
+                        {items.length} product{items.length > 1 ? "s" : ""} - Total Rs.{orderTotal.toFixed(0)}
+                      </Typography>
+                      <Button
+                        size="small"
+                        onClick={() => toggleExpand(o.order_id)}
+                        sx={{
+                          minWidth: 0,
+                          px: 1,
+                          py: 0.25,
+                          textTransform: "none",
+                          fontWeight: 700,
+                          fontSize: 11.5,
+                          color: "#2563eb",
+                        }}
+                      >
+                        View Products
+                      </Button>
+                    </Box>
+                  )}
+
+                  {hasItems && isExpanded && (
                     <Box mt={1} display="flex" flexDirection="column" gap={0.5}>
                       {items.map((it) => (
                         <Box
@@ -786,7 +844,7 @@ export default function Orders({ dark }) {
                             )}
                           </Typography>
                           <Chip
-                            label={it.order_type === "adhoc" ? "Adhoc" : "Sub"}
+                            label={it.order_type === "adhoc" ? "Tomorrow" : "Daily"}
                             size="small"
                             sx={{
                               height: 16, fontSize: 10, fontWeight: 700,
@@ -813,6 +871,33 @@ export default function Orders({ dark }) {
                   gap={0.8}
                   flexShrink={0}
                 >
+                  {hasItems && (
+                    <Button
+                      size="small"
+                      onClick={() => toggleExpand(o.order_id)}
+                      endIcon={
+                        <ExpandMoreIcon
+                          fontSize="small"
+                          sx={{
+                            transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                            transition: "transform 0.2s",
+                          }}
+                        />
+                      }
+                      sx={{
+                        minWidth: 0,
+                        px: 1,
+                        py: 0.15,
+                        textTransform: "none",
+                        fontWeight: 700,
+                        fontSize: 11.5,
+                        color: "#475569",
+                      }}
+                    >
+                      {isExpanded ? "Collapse" : "Expand"}
+                    </Button>
+                  )}
+
                   {!hasItems && (
                     <Chip
                       label={`Qty: ${o.quantity}`}
