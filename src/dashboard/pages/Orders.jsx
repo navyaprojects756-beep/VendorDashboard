@@ -25,6 +25,7 @@ import {
 import SearchIcon         from "@mui/icons-material/Search"
 import ApartmentIcon      from "@mui/icons-material/Apartment"
 import GridViewIcon       from "@mui/icons-material/GridView"
+import HomeIcon           from "@mui/icons-material/Home"
 import ExpandMoreIcon     from "@mui/icons-material/ExpandMore"
 import LocalShippingIcon  from "@mui/icons-material/LocalShipping"
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty"
@@ -51,6 +52,7 @@ const isSameDay = (orderDate, targetStr) => {
 }
 
 const toNum = (value) => Number.parseFloat(value || 0) || 0
+const INDIVIDUAL_VALUE = "__individual__"
 const getOrderDelivery = (order) => {
   const direct = toNum(order?.delivery_charge_amount)
   if (direct > 0) return direct
@@ -84,7 +86,7 @@ export default function Orders({ dark }) {
     API.get(`/orders?token=${getToken()}`).then((res) => {
       setOrders(res.data.orders)
       const uniqueApts = [
-        ...new Set(res.data.orders.map((o) => o.apartment).filter(Boolean)),
+        ...new Set(res.data.orders.map((o) => o.apartment_name || o.apartment).filter(Boolean)),
       ]
       setApartments(uniqueApts)
     }).catch((err) => {
@@ -165,14 +167,25 @@ export default function Orders({ dark }) {
       data = data.filter(
         (o) =>
           o.phone.includes(search) ||
+          (o.customer_name || "").toLowerCase().includes(q) ||
           (o.address || "").toLowerCase().includes(q)
       )
     }
 
-    // apartment
-    if (apartment) {
-      data = data.filter((o) => o.apartment === apartment)
-      setBlocks([...new Set(data.map((o) => o.block_name).filter(Boolean))])
+    // apartment / individual
+    if (apartment === INDIVIDUAL_VALUE) {
+      data = data.filter((o) => o.address_type !== "apartment")
+      setBlocks([])
+    } else if (apartment) {
+      data = data.filter((o) => (o.apartment_name || o.apartment) === apartment)
+      setBlocks([
+        ...new Set(
+          orders
+            .filter((o) => (o.apartment_name || o.apartment) === apartment)
+            .map((o) => o.block_name)
+            .filter(Boolean)
+        ),
+      ])
     } else {
       setBlocks([])
     }
@@ -588,12 +601,13 @@ export default function Orders({ dark }) {
             onChange={(e) => { setApartment(e.target.value); setBlock("") }}
             startAdornment={
               <InputAdornment position="start">
-                <ApartmentIcon fontSize="small" sx={{ color: "text.disabled", ml: 0.5 }} />
+                {apartment === INDIVIDUAL_VALUE ? <HomeIcon fontSize="small" sx={{ color: "text.disabled", ml: 0.5 }} /> : <ApartmentIcon fontSize="small" sx={{ color: "text.disabled", ml: 0.5 }} />}
               </InputAdornment>
             }
             sx={{ flex: "1 1 120px", minWidth: 110, borderRadius: 2, fontSize: 13 }}
           >
-            <MenuItem value="">All Apts</MenuItem>
+            <MenuItem value="">All Locations</MenuItem>
+            <MenuItem value={INDIVIDUAL_VALUE}>Individual Houses</MenuItem>
             {apartments.map((a) => (
               <MenuItem key={a} value={a} sx={{ fontSize: 13 }}>{a}</MenuItem>
             ))}
@@ -603,7 +617,7 @@ export default function Orders({ dark }) {
             size="small"
             value={block}
             displayEmpty
-            disabled={!apartment}
+            disabled={!apartment || apartment === INDIVIDUAL_VALUE}
             onChange={(e) => setBlock(e.target.value)}
             startAdornment={
               <InputAdornment position="start">
@@ -940,3 +954,6 @@ export default function Orders({ dark }) {
     </Box>
   )
 }
+
+
+

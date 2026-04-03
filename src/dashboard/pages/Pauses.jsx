@@ -8,10 +8,13 @@ import SearchIcon     from "@mui/icons-material/Search"
 import EventIcon      from "@mui/icons-material/Event"
 import HomeIcon       from "@mui/icons-material/Home"
 import ApartmentIcon  from "@mui/icons-material/Apartment"
+import GridViewIcon   from "@mui/icons-material/GridView"
 import AllInboxIcon   from "@mui/icons-material/AllInbox"
 import API, { getToken } from "../../services/api"
 import Toast from "../../components/Toast"
 import { formatISTDate, getISTDateStr, parseDateOnly } from "../../utils/istDate"
+
+const INDIVIDUAL_VALUE = "__individual__"
 
 function fmtDate(val) {
   if (!val) return "-"
@@ -42,6 +45,7 @@ export default function Pauses({ dark }) {
   const [loading, setLoading] = useState(true)
   const [search,  setSearch]  = useState("")
   const [apartmentFilter, setApartmentFilter] = useState("")
+  const [blockFilter, setBlockFilter] = useState("")
   const [toast,    setToast]    = useState({ open: false, message: "", type: "success" })
 
   const token = getToken()
@@ -61,13 +65,22 @@ export default function Pauses({ dark }) {
   useEffect(() => { load() }, [])
 
   const apartments = [...new Set(pauses.map((p) => p.apartment_name).filter(Boolean))]
+  const blocks = apartmentFilter && apartmentFilter !== INDIVIDUAL_VALUE
+    ? [...new Set(pauses.filter((p) => p.apartment_name === apartmentFilter).map((p) => p.block_name).filter(Boolean))]
+    : []
 
   const filtered = pauses.filter((p) => {
     const matchesSearch =
       p.phone?.includes(search) ||
+      (p.customer_name || "").toLowerCase().includes(search.toLowerCase()) ||
       formatAddress(p).toLowerCase().includes(search.toLowerCase())
-    const matchesApartment = !apartmentFilter || p.apartment_name === apartmentFilter
-    return matchesSearch && matchesApartment
+    const matchesApartment =
+      !apartmentFilter ||
+      (apartmentFilter === INDIVIDUAL_VALUE
+        ? p.address_type !== "apartment"
+        : p.apartment_name === apartmentFilter)
+    const matchesBlock = !blockFilter || p.block_name === blockFilter
+    return matchesSearch && matchesApartment && matchesBlock
   })
 
   const indefinite = pauses.filter(p => !p.pause_until).length
@@ -137,11 +150,33 @@ export default function Pauses({ dark }) {
           size="small"
           displayEmpty
           value={apartmentFilter}
-          onChange={(e) => setApartmentFilter(e.target.value)}
+          onChange={(e) => {
+            setApartmentFilter(e.target.value)
+            setBlockFilter("")
+          }}
           sx={{ minWidth: 180, background: cardBg, borderRadius: 2, fontSize: 13 }}
         >
-          <MenuItem value="">All Apartments</MenuItem>
+          <MenuItem value="">All Locations</MenuItem>
+          <MenuItem value={INDIVIDUAL_VALUE}>Individual Houses</MenuItem>
           {apartments.map((name) => (
+            <MenuItem key={name} value={name}>{name}</MenuItem>
+          ))}
+        </Select>
+        <Select
+          size="small"
+          displayEmpty
+          value={blockFilter}
+          disabled={!apartmentFilter || apartmentFilter === INDIVIDUAL_VALUE}
+          onChange={(e) => setBlockFilter(e.target.value)}
+          sx={{ minWidth: 160, background: cardBg, borderRadius: 2, fontSize: 13 }}
+          startAdornment={(
+            <InputAdornment position="start">
+              <GridViewIcon fontSize="small" sx={{ color: subText, ml: 0.5 }} />
+            </InputAdornment>
+          )}
+        >
+          <MenuItem value="">All Blocks</MenuItem>
+          {blocks.map((name) => (
             <MenuItem key={name} value={name}>{name}</MenuItem>
           ))}
         </Select>
@@ -191,6 +226,11 @@ export default function Pauses({ dark }) {
                         <Typography fontWeight={700} fontSize={14} color={dark ? "#f1f5f9" : "#111827"}>
                           +{pause.phone}
                         </Typography>
+                        {pause.customer_name && (
+                          <Typography fontSize={12.5} color={subText} fontWeight={600}>
+                            {pause.customer_name}
+                          </Typography>
+                        )}
                         <Chip
                           size="small"
                           label={isManual ? "Manual Resume" : `${days} day${days !== 1 ? "s" : ""} left`}

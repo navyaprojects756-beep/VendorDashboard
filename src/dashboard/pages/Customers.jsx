@@ -12,6 +12,8 @@ import {
 
 import SearchIcon               from "@mui/icons-material/Search"
 import ApartmentIcon            from "@mui/icons-material/Apartment"
+import HomeIcon                 from "@mui/icons-material/Home"
+import GridViewIcon             from "@mui/icons-material/GridView"
 import PeopleIcon               from "@mui/icons-material/People"
 import ReceiptLongIcon          from "@mui/icons-material/ReceiptLong"
 import DownloadIcon             from "@mui/icons-material/Download"
@@ -49,6 +51,7 @@ const getLastMonth = () => {
   }
 }
 const fmtDate = (str) => formatISTDate(str)
+const INDIVIDUAL_VALUE = "__individual__"
 
 const toNum = (value) => Number.parseFloat(value || 0) || 0
 const getOrderDelivery = (order) => {
@@ -74,6 +77,7 @@ export default function Customers({ dark }) {
 
   const [search,     setSearch]     = useState("")
   const [aptFilter,  setAptFilter]  = useState("")
+  const [blockFilter, setBlockFilter] = useState("")
   const [apartments, setApartments] = useState([])
 
   /* bill period: "this" | "last" */
@@ -124,11 +128,21 @@ export default function Customers({ dark }) {
     let data = [...customers]
     if (search) {
       const q = search.toLowerCase()
-      data = data.filter((c) => c.phone.includes(search) || (c.address || "").toLowerCase().includes(q))
+      data = data.filter((c) =>
+        c.phone.includes(search) ||
+        (c.customer_name || "").toLowerCase().includes(q) ||
+        (c.address || "").toLowerCase().includes(q)
+      )
     }
-    if (aptFilter) data = data.filter((c) => c.apartment_name === aptFilter)
+    if (aptFilter === INDIVIDUAL_VALUE) data = data.filter((c) => c.address_type !== "apartment")
+    else if (aptFilter) data = data.filter((c) => c.apartment_name === aptFilter)
+    if (blockFilter) data = data.filter((c) => c.block_name === blockFilter)
     setFiltered(data)
-  }, [search, aptFilter, customers])
+  }, [search, aptFilter, blockFilter, customers])
+
+  const blocks = aptFilter && aptFilter !== INDIVIDUAL_VALUE
+    ? [...new Set(customers.filter((c) => c.apartment_name === aptFilter).map((c) => c.block_name).filter(Boolean))]
+    : []
 
   /* ── invoice dialog ── */
   const fetchInvoice = async (customerId) => {
@@ -287,19 +301,28 @@ export default function Customers({ dark }) {
       <Paper elevation={0} sx={{ px: 1.5, py: 1.2, mb: 2, borderRadius: 3, border: `1px solid ${border}`, background: bg }}>
         <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
 
-          {/* Search */}
-          <TextField size="small" placeholder="Search phone or address…" value={search}
+          <TextField size="small" placeholder="Search name, phone or address..." value={search}
             onChange={(e) => setSearch(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: textSecondary }} /></InputAdornment> }}
             sx={{ flex: "1 1 170px", "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }} />
 
           {/* Apartment filter */}
           <Select size="small" value={aptFilter} displayEmpty
-            onChange={(e) => setAptFilter(e.target.value)}
-            startAdornment={<InputAdornment position="start"><ApartmentIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /></InputAdornment>}
+            onChange={(e) => { setAptFilter(e.target.value); setBlockFilter("") }}
+            startAdornment={<InputAdornment position="start">{aptFilter === INDIVIDUAL_VALUE ? <HomeIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /> : <ApartmentIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} />}</InputAdornment>}
             sx={{ flex: "1 1 150px", borderRadius: 2, fontSize: 13 }}>
-            <MenuItem value="">All Apartments</MenuItem>
+            <MenuItem value="">All Locations</MenuItem>
+            <MenuItem value={INDIVIDUAL_VALUE}>Individual Houses</MenuItem>
             {apartments.map((a) => <MenuItem key={a} value={a} sx={{ fontSize: 13 }}>{a}</MenuItem>)}
+          </Select>
+
+          <Select size="small" value={blockFilter} displayEmpty
+            disabled={!aptFilter || aptFilter === INDIVIDUAL_VALUE}
+            onChange={(e) => setBlockFilter(e.target.value)}
+            startAdornment={<InputAdornment position="start"><GridViewIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /></InputAdornment>}
+            sx={{ flex: "1 1 130px", borderRadius: 2, fontSize: 13 }}>
+            <MenuItem value="">All Blocks</MenuItem>
+            {blocks.map((b) => <MenuItem key={b} value={b} sx={{ fontSize: 13 }}>{b}</MenuItem>)}
           </Select>
 
           {/* Month pills */}
@@ -326,12 +349,9 @@ export default function Customers({ dark }) {
           Bill period: <Box component="span" fontWeight={700} color={textPrimary}>{range.label} &nbsp;·&nbsp; {fmtDate(range.from)} → {fmtDate(range.to)}</Box>
         </Typography>
       </Paper>
-
       <Typography fontSize={13} color={textSecondary} mb={1} px={0.5}>
-        {filtered.length} customer{filtered.length !== 1 ? "s" : ""}{aptFilter ? ` · ${aptFilter}` : ""}
+        {filtered.length} customer{filtered.length !== 1 ? "s" : ""}{aptFilter ? ` - ${aptFilter === INDIVIDUAL_VALUE ? "Individual Houses" : aptFilter}` : ""}{blockFilter ? ` - ${blockFilter}` : ""}
       </Typography>
-
-      {/* ── Customer list ── */}
       <Paper elevation={0} sx={{ borderRadius: 3, border: `1px solid ${border}`, overflow: "hidden", background: bg }}>
         {loading && <Box py={8} textAlign="center"><CircularProgress size={24} sx={{ color: "#2563eb" }} /></Box>}
         {!loading && filtered.length === 0 && (
@@ -355,6 +375,11 @@ export default function Customers({ dark }) {
                     <Typography fontWeight={700} fontSize={14} color={textPrimary} sx={{ wordBreak: "break-all" }}>
                       {c.phone}
                     </Typography>
+                    {c.customer_name && (
+                      <Typography fontWeight={700} fontSize={14} color={textPrimary}>
+                        {c.customer_name}
+                      </Typography>
+                    )}
                     <Chip label={isActive ? "Active" : "Inactive"} size="small"
                       sx={{
                         fontSize: 10, fontWeight: 700, height: 18, flexShrink: 0,

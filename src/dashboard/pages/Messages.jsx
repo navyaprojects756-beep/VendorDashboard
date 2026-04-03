@@ -1,20 +1,30 @@
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import API, { getToken } from "../../services/api"
 import {
   Box, Typography, Paper, Chip, CircularProgress,
-  Badge, Divider, IconButton, Tooltip,
+  Badge, Divider, IconButton, Tooltip, TextField,
+  InputAdornment, Select, MenuItem, ToggleButtonGroup,
+  ToggleButton,
 } from "@mui/material"
-import MessageIcon      from "@mui/icons-material/Message"
-import RefreshIcon      from "@mui/icons-material/Refresh"
-import ImageIcon        from "@mui/icons-material/Image"
-import MicIcon          from "@mui/icons-material/Mic"
+import MessageIcon from "@mui/icons-material/Message"
+import RefreshIcon from "@mui/icons-material/Refresh"
+import ImageIcon from "@mui/icons-material/Image"
+import MicIcon from "@mui/icons-material/Mic"
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile"
-import ArrowBackIcon    from "@mui/icons-material/ArrowBack"
-import { formatISTDate, formatISTDateTime, getISTNow } from "../../utils/istDate"
+import ArrowBackIcon from "@mui/icons-material/ArrowBack"
+import SearchIcon from "@mui/icons-material/Search"
+import ApartmentIcon from "@mui/icons-material/Apartment"
+import GridViewIcon from "@mui/icons-material/GridView"
+import CalendarTodayIcon from "@mui/icons-material/CalendarToday"
+import HomeIcon from "@mui/icons-material/Home"
+import PersonIcon from "@mui/icons-material/Person"
+import { formatISTDate, formatISTDateTime, getISTDateStr, getISTNow, toISTDateStr } from "../../utils/istDate"
+
+const INDIVIDUAL_VALUE = "__individual__"
 
 function msgIcon(type) {
-  if (type === "image")    return <ImageIcon sx={{ fontSize: 14 }} />
-  if (type === "audio")    return <MicIcon   sx={{ fontSize: 14 }} />
+  if (type === "image") return <ImageIcon sx={{ fontSize: 14 }} />
+  if (type === "audio") return <MicIcon sx={{ fontSize: 14 }} />
   if (type === "document") return <InsertDriveFileIcon sx={{ fontSize: 14 }} />
   return null
 }
@@ -35,20 +45,37 @@ function fmtFull(val) {
 
 function msgPreview(m) {
   if (m.content) return m.content
-  if (m.message_type === "image")    return "📷 Image"
-  if (m.message_type === "audio")    return "🎵 Audio"
-  if (m.message_type === "document") return "📄 Document"
-  if (m.message_type === "video")    return "🎬 Video"
+  if (m.message_type === "image") return "Photo"
+  if (m.message_type === "audio") return "Voice message"
+  if (m.message_type === "document") return "Document"
+  if (m.message_type === "video") return "Video"
   return "Message"
 }
 
+function safeText(value, fallback = "") {
+  const text = String(value || "").trim()
+  return text || fallback
+}
+
+function locationLabel(convo) {
+  if (convo?.address_type === "apartment") return convo.apartment_name || "Apartment"
+  return "Individual"
+}
+
 export default function Messages() {
-  const [conversations, setConversations]   = useState([])
-  const [selected,      setSelected]        = useState(null)  // phone string
-  const [thread,        setThread]          = useState([])
-  const [loading,       setLoading]         = useState(true)
-  const [threadLoading, setThreadLoading]   = useState(false)
-  const [isMobile,      setIsMobile]        = useState(window.innerWidth < 700)
+  const [conversations, setConversations] = useState([])
+  const [selected, setSelected] = useState(null)
+  const [selectedMeta, setSelectedMeta] = useState(null)
+  const [thread, setThread] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [threadLoading, setThreadLoading] = useState(false)
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 700)
+  const [search, setSearch] = useState("")
+  const [locationFilter, setLocationFilter] = useState("")
+  const [blockFilter, setBlockFilter] = useState("")
+  const [dateMode, setDateMode] = useState("today")
+  const [fromDate, setFromDate] = useState(getISTDateStr(0))
+  const [toDate, setToDate] = useState(getISTDateStr(0))
   const bottomRef = useRef(null)
 
   const loadConvos = async (silent = false) => {
@@ -66,8 +93,8 @@ export default function Messages() {
     try {
       const r = await API.get(`/messages/thread/${encodeURIComponent(phone)}?token=${getToken()}`)
       setThread(r.data.messages || [])
-      // mark as read in local state
-      setConversations(prev => prev.map(c =>
+      setSelectedMeta(r.data.conversation || { phone })
+      setConversations((prev) => prev.map((c) =>
         c.phone === phone ? { ...c, unread_count: 0, is_read: true } : c
       ))
     } finally {
@@ -86,6 +113,15 @@ export default function Messages() {
   }, [selected])
 
   useEffect(() => {
+    if (!selected) {
+      setSelectedMeta(null)
+      return
+    }
+    const convo = conversations.find((c) => c.phone === selected)
+    if (convo) setSelectedMeta(convo)
+  }, [selected, conversations])
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [thread])
 
@@ -97,13 +133,47 @@ export default function Messages() {
 
   const totalUnread = conversations.reduce((s, c) => s + (c.unread_count || 0), 0)
 
-  const showList   = !isMobile || !selected
+  const apartments = useMemo(
+    () => [...new Set(conversations.filter((c) => c.address_type === "apartment").map((c) => c.apartment_name).filter(Boolean))],
+    [conversations]
+  )
+
+  const blocks = useMemo(() => {
+    if (!locationFilter || locationFilter === INDIVIDUAL_VALUE) return []
+    return [...new Set(conversations.filter((c) => c.apartment_name === locationFilter).map((c) => c.block_name).filter(Boolean))]
+  }, [conversations, locationFilter])
+
+  const filteredConversations = useMemo(() => {
+    const today = getISTDateStr(0)
+    return conversations.filter((c) => {
+      const convoDate = toISTDateStr(c.created_at)
+      const inDateRange = dateMode === "custom"
+        ? convoDate >= fromDate && convoDate <= toDate
+        : convoDate === today
+      if (!inDateRange) return false
+
+      if (locationFilter === INDIVIDUAL_VALUE && c.address_type === "apartment") return false
+      if (locationFilter && locationFilter !== INDIVIDUAL_VALUE && c.apartment_name !== locationFilter) return false
+      if (blockFilter && c.block_name !== blockFilter) return false
+
+      if (!search.trim()) return true
+      const q = search.toLowerCase()
+      return [
+        c.phone,
+        c.customer_name,
+        c.address,
+        c.apartment_name,
+        c.block_name,
+        msgPreview(c),
+      ].some((value) => String(value || "").toLowerCase().includes(q))
+    })
+  }, [blockFilter, conversations, dateMode, fromDate, locationFilter, search, toDate])
+
+  const showList = !isMobile || !selected
   const showThread = !isMobile || !!selected
 
   return (
-    <Box sx={{ maxWidth: 900, margin: "auto", px: { xs: 1, sm: 2 }, py: 3 }}>
-
-      {/* Header */}
+    <Box sx={{ maxWidth: 1080, margin: "auto", px: { xs: 1, sm: 2 }, py: 3 }}>
       <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
         <Box display="flex" alignItems="center" gap={1}>
           <Badge badgeContent={totalUnread || null} color="error">
@@ -111,8 +181,7 @@ export default function Messages() {
           </Badge>
           <Typography fontWeight={700} fontSize={17}>Messages</Typography>
           {totalUnread > 0 && (
-            <Chip label={`${totalUnread} unread`} size="small" color="error"
-              sx={{ fontWeight: 600, fontSize: 11, height: 20 }} />
+            <Chip label={`${totalUnread} unread`} size="small" color="error" sx={{ fontWeight: 600, fontSize: 11, height: 20 }} />
           )}
         </Box>
         <Tooltip title="Refresh">
@@ -122,32 +191,148 @@ export default function Messages() {
         </Tooltip>
       </Box>
 
-      <Paper elevation={0} sx={{
-        borderRadius: 3, border: "1px solid #e5e7eb", overflow: "hidden",
-        display: "flex", height: "calc(100vh - 200px)", minHeight: 400,
-      }}>
+      <Paper elevation={0} sx={{ px: 1.5, py: 1.2, mb: 2, borderRadius: 3, border: "1px solid #e5e7eb" }}>
+        <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+          <TextField
+            size="small"
+            placeholder="Search name, phone, message or address..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" sx={{ color: "text.disabled" }} />
+                </InputAdornment>
+              ),
+            }}
+            sx={{ flex: "1 1 220px", minWidth: 190, "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }}
+          />
 
-        {/* Conversation List */}
+          <Box display="flex" alignItems="center" gap={0.6}>
+            <CalendarTodayIcon sx={{ fontSize: 16, color: "text.disabled" }} />
+            <Typography fontSize={12} fontWeight={600} color="text.secondary">Date</Typography>
+          </Box>
+
+          <ToggleButtonGroup
+            size="small"
+            exclusive
+            value={dateMode}
+            onChange={(_, value) => {
+              if (!value) return
+              setDateMode(value)
+              if (value !== "custom") {
+                const today = getISTDateStr(0)
+                setFromDate(today)
+                setToDate(today)
+              }
+            }}
+            sx={{
+              "& .MuiToggleButton-root": {
+                border: "1px solid #e5e7eb",
+                color: "text.secondary",
+                textTransform: "none",
+                fontSize: 12,
+                fontWeight: 600,
+              },
+              "& .MuiToggleButton-root.Mui-selected": {
+                background: "#2563eb",
+                color: "white",
+                borderColor: "#2563eb",
+              },
+            }}
+          >
+            <ToggleButton value="today">Today</ToggleButton>
+            <ToggleButton value="custom">Custom</ToggleButton>
+          </ToggleButtonGroup>
+
+          {dateMode === "custom" && (
+            <Box display="flex" alignItems="center" gap={0.8} flexWrap="wrap">
+              <TextField
+                type="date"
+                size="small"
+                label="From"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                sx={{ width: 142, "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }}
+              />
+              <TextField
+                type="date"
+                size="small"
+                label="To"
+                value={toDate}
+                inputProps={{ min: fromDate }}
+                onChange={(e) => setToDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                sx={{ width: 142, "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }}
+              />
+            </Box>
+          )}
+
+          <Select
+            size="small"
+            value={locationFilter}
+            displayEmpty
+            onChange={(e) => {
+              setLocationFilter(e.target.value)
+              setBlockFilter("")
+            }}
+            startAdornment={(
+              <InputAdornment position="start">
+                {locationFilter === INDIVIDUAL_VALUE
+                  ? <HomeIcon fontSize="small" sx={{ color: "text.disabled", ml: 0.5 }} />
+                  : <ApartmentIcon fontSize="small" sx={{ color: "text.disabled", ml: 0.5 }} />
+                }
+              </InputAdornment>
+            )}
+            sx={{ minWidth: 180, borderRadius: 2, fontSize: 13 }}
+          >
+            <MenuItem value="">All Locations</MenuItem>
+            <MenuItem value={INDIVIDUAL_VALUE}>Individual Houses</MenuItem>
+            {apartments.map((name) => (
+              <MenuItem key={name} value={name}>{name}</MenuItem>
+            ))}
+          </Select>
+
+          <Select
+            size="small"
+            value={blockFilter}
+            displayEmpty
+            disabled={!locationFilter || locationFilter === INDIVIDUAL_VALUE}
+            onChange={(e) => setBlockFilter(e.target.value)}
+            startAdornment={(
+              <InputAdornment position="start">
+                <GridViewIcon fontSize="small" sx={{ color: "text.disabled", ml: 0.5 }} />
+              </InputAdornment>
+            )}
+            sx={{ minWidth: 150, borderRadius: 2, fontSize: 13 }}
+          >
+            <MenuItem value="">All Blocks</MenuItem>
+            {blocks.map((name) => (
+              <MenuItem key={name} value={name}>{name}</MenuItem>
+            ))}
+          </Select>
+        </Box>
+      </Paper>
+
+      <Paper elevation={0} sx={{ borderRadius: 3, border: "1px solid #e5e7eb", overflow: "hidden", display: "flex", height: "calc(100vh - 280px)", minHeight: 470 }}>
         {showList && (
-          <Box sx={{
-            width: isMobile ? "100%" : 280,
-            borderRight: isMobile ? "none" : "1px solid #e5e7eb",
-            overflowY: "auto",
-            flexShrink: 0,
-          }}>
+          <Box sx={{ width: isMobile ? "100%" : 340, borderRight: isMobile ? "none" : "1px solid #e5e7eb", overflowY: "auto", flexShrink: 0 }}>
             {loading ? (
               <Box display="flex" justifyContent="center" pt={4}><CircularProgress size={28} /></Box>
-            ) : conversations.length === 0 ? (
+            ) : filteredConversations.length === 0 ? (
               <Box py={6} textAlign="center" px={2}>
                 <MessageIcon sx={{ fontSize: 40, color: "#d1d5db", mb: 1 }} />
                 <Typography color="text.secondary" fontSize={13}>
-                  No messages yet. Unhandled WhatsApp messages from customers will appear here.
+                  No conversations match the current filters.
                 </Typography>
               </Box>
             ) : (
-              conversations.map((c, i) => {
+              filteredConversations.map((c, i) => {
                 const isActive = selected === c.phone
                 const hasUnread = (c.unread_count || 0) > 0
+                const title = safeText(c.customer_name, c.phone)
+                const subtitle = c.customer_name ? c.phone : "WhatsApp"
                 return (
                   <Box key={c.phone}>
                     <Box
@@ -158,30 +343,39 @@ export default function Messages() {
                         "&:hover": { background: isActive ? "#eff6ff" : "#f9fafb" },
                       }}
                     >
-                      <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-                        <Typography fontWeight={hasUnread ? 700 : 600} fontSize={13.5} color={isActive ? "#2563eb" : "text.primary"}>
-                          {c.phone}
-                        </Typography>
-                        <Typography fontSize={11} color="text.disabled" flexShrink={0} ml={1}>
+                      <Box display="flex" justifyContent="space-between" alignItems="flex-start" gap={1}>
+                        <Box minWidth={0} flex={1}>
+                          <Box display="flex" alignItems="center" gap={0.7} flexWrap="wrap">
+                            <Typography fontWeight={hasUnread ? 700 : 600} fontSize={13.5} color={isActive ? "#2563eb" : "text.primary"} sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 180 }}>
+                              {title}
+                            </Typography>
+                            <Chip label={locationLabel(c)} size="small" sx={{ height: 18, fontSize: 10, fontWeight: 700, background: c.address_type === "apartment" ? "#eff6ff" : "#f3f4f6", color: c.address_type === "apartment" ? "#2563eb" : "#475569" }} />
+                          </Box>
+                          <Typography fontSize={11} color="text.secondary" sx={{ mt: 0.15 }}>
+                            {subtitle}
+                          </Typography>
+                        </Box>
+                        <Typography fontSize={11} color="text.disabled" flexShrink={0}>
                           {fmtTime(c.created_at)}
                         </Typography>
                       </Box>
-                      <Box display="flex" justifyContent="space-between" alignItems="center" mt={0.3}>
-                        <Typography fontSize={12} color="text.secondary"
-                          sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+
+                      {c.address && (
+                        <Typography fontSize={11.5} color="text.secondary" sx={{ mt: 0.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {c.address}
+                        </Typography>
+                      )}
+
+                      <Box display="flex" justifyContent="space-between" alignItems="center" mt={0.5} gap={1}>
+                        <Typography fontSize={12} color="text.secondary" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
                           {msgPreview(c)}
                         </Typography>
                         {hasUnread && (
-                          <Chip
-                            label={c.unread_count}
-                            size="small"
-                            color="primary"
-                            sx={{ fontSize: 10, height: 18, minWidth: 18, ml: 0.5, fontWeight: 700 }}
-                          />
+                          <Chip label={c.unread_count} size="small" color="primary" sx={{ fontSize: 10, height: 18, minWidth: 18, fontWeight: 700 }} />
                         )}
                       </Box>
                     </Box>
-                    {i < conversations.length - 1 && <Divider />}
+                    {i < filteredConversations.length - 1 && <Divider />}
                   </Box>
                 )
               })
@@ -189,31 +383,40 @@ export default function Messages() {
           </Box>
         )}
 
-        {/* Thread Panel */}
         {showThread && (
           <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
             {!selected ? (
-              <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center"
-                height="100%" gap={1} color="text.disabled">
+              <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100%" gap={1} color="text.disabled">
                 <MessageIcon sx={{ fontSize: 48 }} />
                 <Typography fontSize={14}>Select a conversation</Typography>
               </Box>
             ) : (
               <>
-                {/* Thread header */}
                 <Box sx={{ px: 2, py: 1.5, borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", gap: 1 }}>
                   {isMobile && (
                     <IconButton size="small" onClick={() => setSelected(null)}>
                       <ArrowBackIcon fontSize="small" />
                     </IconButton>
                   )}
-                  <Box>
-                    <Typography fontWeight={700} fontSize={14}>{selected}</Typography>
-                    <Typography fontSize={11} color="text.secondary">WhatsApp</Typography>
+                  <Box minWidth={0}>
+                    <Box display="flex" alignItems="center" gap={0.8} flexWrap="wrap">
+                      <Typography fontWeight={700} fontSize={14}>{safeText(selectedMeta?.customer_name, selected)}</Typography>
+                      {selectedMeta?.address_type === "apartment" ? (
+                        <Chip size="small" icon={<ApartmentIcon sx={{ fontSize: "14px !important" }} />} label={selectedMeta?.apartment_name || "Apartment"} sx={{ height: 20, fontSize: 10, fontWeight: 700, background: "#eff6ff", color: "#2563eb" }} />
+                      ) : (
+                        <Chip size="small" icon={<HomeIcon sx={{ fontSize: "14px !important" }} />} label="Individual" sx={{ height: 20, fontSize: 10, fontWeight: 700, background: "#f3f4f6", color: "#475569" }} />
+                      )}
+                    </Box>
+                    <Box display="flex" alignItems="center" gap={0.6} mt={0.3} flexWrap="wrap">
+                      <PersonIcon sx={{ fontSize: 13, color: "text.secondary" }} />
+                      <Typography fontSize={11} color="text.secondary">{selectedMeta?.phone || selected}</Typography>
+                    </Box>
+                    {selectedMeta?.address && (
+                      <Typography fontSize={11} color="text.secondary" sx={{ mt: 0.25 }}>{selectedMeta.address}</Typography>
+                    )}
                   </Box>
                 </Box>
 
-                {/* Messages */}
                 <Box sx={{ flex: 1, overflowY: "auto", p: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
                   {threadLoading ? (
                     <Box display="flex" justifyContent="center" pt={4}><CircularProgress size={24} /></Box>
@@ -222,18 +425,11 @@ export default function Messages() {
                       No messages in this conversation.
                     </Typography>
                   ) : (
-                    thread.map(m => {
+                    thread.map((m) => {
                       const isInbound = m.direction === "inbound"
                       return (
-                        <Box key={m.message_id} display="flex"
-                          justifyContent={isInbound ? "flex-start" : "flex-end"}>
-                          <Box sx={{
-                            maxWidth: "75%",
-                            px: 1.5, py: 1,
-                            borderRadius: isInbound ? "4px 12px 12px 12px" : "12px 4px 12px 12px",
-                            background: isInbound ? "#f3f4f6" : "#dbeafe",
-                            position: "relative",
-                          }}>
+                        <Box key={m.message_id} display="flex" justifyContent={isInbound ? "flex-start" : "flex-end"}>
+                          <Box sx={{ maxWidth: "75%", px: 1.5, py: 1, borderRadius: isInbound ? "4px 12px 12px 12px" : "12px 4px 12px 12px", background: isInbound ? "#f3f4f6" : "#dbeafe", position: "relative" }}>
                             {m.message_type !== "text" && (
                               <Box display="flex" alignItems="center" gap={0.5} mb={0.3} color="text.secondary">
                                 {msgIcon(m.message_type)}
@@ -264,13 +460,9 @@ export default function Messages() {
                   <div ref={bottomRef} />
                 </Box>
 
-                {/* Info bar */}
-                <Box sx={{
-                  px: 2, py: 1, borderTop: "1px solid #e5e7eb",
-                  background: "#fafafa",
-                }}>
+                <Box sx={{ px: 2, py: 1, borderTop: "1px solid #e5e7eb", background: "#fafafa" }}>
                   <Typography fontSize={12} color="text.secondary">
-                    💡 Replies are sent automatically. Customer receives the auto-reply with your contact number.
+                    Replies are sent automatically. The customer also gets the vendor follow-up note on WhatsApp.
                   </Typography>
                 </Box>
               </>
