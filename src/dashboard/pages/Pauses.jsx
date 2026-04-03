@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import {
   Box, Typography, Card, CardContent, Chip,
-  Skeleton, Divider, TextField, InputAdornment, Alert
+  Skeleton, Divider, TextField, InputAdornment, Alert, Select, MenuItem
 } from "@mui/material"
 import PauseCircleIcon from "@mui/icons-material/PauseCircle"
 import SearchIcon     from "@mui/icons-material/Search"
@@ -41,6 +41,7 @@ export default function Pauses({ dark }) {
   const [pauses,  setPauses]  = useState([])
   const [loading, setLoading] = useState(true)
   const [search,  setSearch]  = useState("")
+  const [apartmentFilter, setApartmentFilter] = useState("")
   const [toast,    setToast]    = useState({ open: false, message: "", type: "success" })
 
   const token = getToken()
@@ -59,10 +60,15 @@ export default function Pauses({ dark }) {
 
   useEffect(() => { load() }, [])
 
-  const filtered = pauses.filter(p =>
-    p.phone?.includes(search) ||
-    formatAddress(p).toLowerCase().includes(search.toLowerCase())
-  )
+  const apartments = [...new Set(pauses.map((p) => p.apartment_name).filter(Boolean))]
+
+  const filtered = pauses.filter((p) => {
+    const matchesSearch =
+      p.phone?.includes(search) ||
+      formatAddress(p).toLowerCase().includes(search.toLowerCase())
+    const matchesApartment = !apartmentFilter || p.apartment_name === apartmentFilter
+    return matchesSearch && matchesApartment
+  })
 
   const indefinite = pauses.filter(p => !p.pause_until).length
   const scheduled  = pauses.filter(p =>  p.pause_until).length
@@ -112,7 +118,7 @@ export default function Pauses({ dark }) {
       </Box>
 
       {/* Search */}
-      <Box mb={2.5}>
+      <Box mb={2.5} display="flex" gap={1.2} flexWrap="wrap">
         <TextField
           size="small"
           placeholder="Search by phone or address…"
@@ -125,8 +131,20 @@ export default function Pauses({ dark }) {
               sx: { background: cardBg, borderRadius: 2, fontSize: 13 }
             }
           }}
-          sx={{ "& .MuiOutlinedInput-root": { "& fieldset": { borderColor: border } } }}
+          sx={{ flex: "1 1 220px", "& .MuiOutlinedInput-root": { "& fieldset": { borderColor: border } } }}
         />
+        <Select
+          size="small"
+          displayEmpty
+          value={apartmentFilter}
+          onChange={(e) => setApartmentFilter(e.target.value)}
+          sx={{ minWidth: 180, background: cardBg, borderRadius: 2, fontSize: 13 }}
+        >
+          <MenuItem value="">All Apartments</MenuItem>
+          {apartments.map((name) => (
+            <MenuItem key={name} value={name}>{name}</MenuItem>
+          ))}
+        </Select>
       </Box>
 
       {/* List */}
