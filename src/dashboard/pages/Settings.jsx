@@ -30,6 +30,59 @@ import ShareIcon          from "@mui/icons-material/Share"
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
+const timeToMinutes = (value) => {
+  if (!value) return null
+  const [h, m] = String(value).slice(0, 5).split(":").map(Number)
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null
+  return (h * 60) + m
+}
+
+const addMinutesToTime = (value, addMins) => {
+  const mins = timeToMinutes(value)
+  if (mins == null) return ""
+  const total = (mins + addMins + 1440) % 1440
+  const hh = String(Math.floor(total / 60)).padStart(2, "0")
+  const mm = String(total % 60).padStart(2, "0")
+  return `${hh}:${mm}`
+}
+
+const formatTime12h = (value) => {
+  if (!value) return ""
+  const [rawH, rawM] = String(value).slice(0, 5).split(":").map(Number)
+  if (!Number.isFinite(rawH) || !Number.isFinite(rawM)) return value
+  const suffix = rawH >= 12 ? "PM" : "AM"
+  const hour = rawH % 12 || 12
+  return `${hour}:${String(rawM).padStart(2, "0")} ${suffix}`
+}
+
+const validateSchedule = (profile = {}, settings = {}) => {
+  const deliveryStart = timeToMinutes(profile.delivery_start)
+  const deliveryEnd = timeToMinutes(profile.delivery_end)
+  const acceptStart = timeToMinutes(profile.order_accept_start)
+  const acceptEnd = timeToMinutes(profile.order_accept_end)
+  const autoGenerate = timeToMinutes(settings.auto_generate_time)
+
+  if ((profile.delivery_start && !profile.delivery_end) || (!profile.delivery_start && profile.delivery_end)) {
+    return "Please set both delivery start and delivery end times."
+  }
+  if ((profile.order_accept_start && !profile.order_accept_end) || (!profile.order_accept_start && profile.order_accept_end)) {
+    return "Please set both order acceptance start and end times."
+  }
+  if (deliveryStart != null && deliveryEnd != null && deliveryStart >= deliveryEnd) {
+    return "Delivery end time must be after delivery start time."
+  }
+  if (acceptStart != null && acceptEnd != null && acceptStart >= acceptEnd) {
+    return "Order acceptance end time must be after order acceptance start time."
+  }
+  if (deliveryEnd != null && acceptStart != null && acceptStart <= deliveryEnd) {
+    return "Order acceptance must start after delivery end time."
+  }
+  if (settings.auto_generate_time && deliveryEnd != null && autoGenerate != null && autoGenerate < deliveryEnd) {
+    return "Daily generation time cannot be earlier than delivery end time."
+  }
+  return ""
+}
+
 /* ── reusable setting row ── */
 function SettingRow({ icon, label, desc, checked, onChange, color = "#2563eb", dark }) {
   const border        = dark ? "#1e293b" : "#e5e7eb"
@@ -94,6 +147,9 @@ export default function Settings({ dark }) {
   const [pSaved, setPSaved] = useState(false)
 
   const [linkCopied, setLinkCopied] = useState(false)
+  const [profileError, setProfileError] = useState("")
+  const [settingsError, setSettingsError] = useState("")
+  const [autoGenerateTouched, setAutoGenerateTouched] = useState(false)
 
   // logo upload
   const [logoFile, setLogoFile]       = useState(null)
@@ -112,8 +168,27 @@ export default function Settings({ dark }) {
     API.get(`/profile?token=${getToken()}`).then((r) => setP(r.data)).finally(() => setPLoad(false))
   }, [])
 
-  const toggleS = (key) => { setS((prev) => ({ ...prev, [key]: !prev[key] })); setSDirty(true); setSSaved(false) }
-  const updateP = (key, val) => { setP((prev) => ({ ...prev, [key]: val })); setPDirty(true); setPSaved(false) }
+  useEffect(() => {
+    if (!pLoad && !sLoad && p.delivery_end && !s.auto_generate_time && !autoGenerateTouched) {
+      const suggested = addMinutesToTime(p.delivery_end, 120)
+      if (suggested) {
+        setS((prev) => ({ ...prev, auto_generate_time: suggested }))
+      }
+    }
+  }, [p.delivery_end, pLoad, sLoad, s.auto_generate_time, autoGenerateTouched])
+
+  const toggleS = (key) => {
+    setSettingsError("")
+    setS((prev) => ({ ...prev, [key]: !prev[key] }))
+    setSDirty(true)
+    setSSaved(false)
+  }
+  const updateP = (key, val) => {
+    setProfileError("")
+    setP((prev) => ({ ...prev, [key]: val }))
+    setPDirty(true)
+    setPSaved(false)
+  }
 
   const handleLogoSelect = (e) => {
     const file = e.target.files[0]
@@ -143,14 +218,39 @@ export default function Settings({ dark }) {
   }
 
   const saveSettings = async () => {
+    const resolvedAutoGenerateTime = s.auto_generate_time || addMinutesToTime(p.delivery_end, 120)
+    const validationError = validateSchedule(p, { ...s, auto_generate_time: resolvedAutoGenerateTime })
+    if (validationError) {
+      setSettingsError(validationError)
+      return
+    }
+
     setSSave(true)
-    await API.post(`/settings?token=${getToken()}`, s)
-    setSSave(false); setSSaved(true); setSDirty(false)
-    setTimeout(() => setSSaved(false), 3000)
+    setSettingsError("")
+    try {
+      await API.post(`/settings?token=${getToken()}`, { ...s, auto_generate_time: resolvedAutoGenerateTime || null })
+      if (!s.auto_generate_time && resolvedAutoGenerateTime) {
+        setS((prev) => ({ ...prev, auto_generate_time: resolvedAutoGenerateTime }))
+      }
+      setSSaved(true)
+      setSDirty(false)
+      setTimeout(() => setSSaved(false), 3000)
+    } catch (err) {
+      setSettingsError(err?.response?.data?.message || "Unable to save settings.")
+    } finally {
+      setSSave(false)
+    }
   }
 
   const saveProfile = async () => {
+    const validationError = validateSchedule(p, s)
+    if (validationError) {
+      setProfileError(validationError)
+      return
+    }
+
     setPSave(true)
+    setProfileError("")
     try {
       let profileData = { ...p }
 
@@ -167,8 +267,11 @@ export default function Settings({ dark }) {
       }
 
       await API.put(`/profile?token=${getToken()}`, profileData)
-      setPSaved(true); setPDirty(false)
+      setPSaved(true)
+      setPDirty(false)
       setTimeout(() => setPSaved(false), 3000)
+    } catch (err) {
+      setProfileError(err?.response?.data?.message || "Unable to save profile.")
     } finally {
       setPSave(false)
     }
@@ -367,17 +470,18 @@ export default function Settings({ dark }) {
           {/* Delivery Timings */}
           <Section title="Delivery Timings" icon={<AccessTimeIcon fontSize="small" />} color="#16a34a" dark={dark}>
             <Box sx={{ p: 2.5, display: "flex", flexDirection: "column", gap: 2 }}>
+              {!!profileError && <Alert severity="error" sx={{ borderRadius: 2 }}>{profileError}</Alert>}
               <Typography fontSize={12} color={textSecondary}>
                 Set the time window when you physically deliver milk to customers.
               </Typography>
               <Box display="flex" gap={1.5} alignItems="center" flexWrap="wrap">
                 <TextField size="small" type="time" label="Delivery Starts"
-                  value={p.delivery_start || ""} onChange={(e) => updateP("delivery_start", e.target.value)}
+                  value={p.delivery_start || ""} onChange={(e) => updateP("delivery_start", e.target.value)} helperText={p.delivery_start ? `Shown to customers as ${formatTime12h(p.delivery_start)}` : "Shown to customers in 12-hour format"}
                   InputLabelProps={{ shrink: true }}
                   sx={{ flex: "1 1 140px", "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }} />
                 <Typography color={textSecondary} fontSize={13}>to</Typography>
                 <TextField size="small" type="time" label="Delivery Ends"
-                  value={p.delivery_end || ""} onChange={(e) => updateP("delivery_end", e.target.value)}
+                  value={p.delivery_end || ""} onChange={(e) => updateP("delivery_end", e.target.value)} helperText={p.delivery_end ? `Shown to customers as ${formatTime12h(p.delivery_end)}` : "Shown to customers in 12-hour format"}
                   InputLabelProps={{ shrink: true }}
                   sx={{ flex: "1 1 140px", "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }} />
               </Box>
@@ -395,12 +499,12 @@ export default function Settings({ dark }) {
               </Box>
               <Box display="flex" gap={1.5} alignItems="center" flexWrap="wrap">
                 <TextField size="small" type="time" label="Accept Orders From"
-                  value={p.order_accept_start || ""} onChange={(e) => updateP("order_accept_start", e.target.value)}
+                  value={p.order_accept_start || ""} onChange={(e) => updateP("order_accept_start", e.target.value)} helperText={p.order_accept_start ? formatTime12h(p.order_accept_start) : ""}
                   InputLabelProps={{ shrink: true }}
                   sx={{ flex: "1 1 140px", "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }} />
                 <Typography color={textSecondary} fontSize={13}>to</Typography>
                 <TextField size="small" type="time" label="Accept Orders Until"
-                  value={p.order_accept_end || ""} onChange={(e) => updateP("order_accept_end", e.target.value)}
+                  value={p.order_accept_end || ""} onChange={(e) => updateP("order_accept_end", e.target.value)} helperText={p.order_accept_end ? formatTime12h(p.order_accept_end) : ""}
                   InputLabelProps={{ shrink: true }}
                   sx={{ flex: "1 1 140px", "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }} />
               </Box>
@@ -438,7 +542,7 @@ export default function Settings({ dark }) {
                   <AccessTimeIcon sx={{ fontSize: 15, color: "#16a34a" }} />
                   <Typography fontSize={12} color={textSecondary}>
                     Orders accepted:{" "}
-                    <Box component="span" fontWeight={700} color={textPrimary}>{p.order_accept_start} – {p.order_accept_end}</Box>
+                    <Box component="span" fontWeight={700} color={textPrimary}>{formatTime12h(p.order_accept_start)} - {formatTime12h(p.order_accept_end)}</Box>
                     {" "}on{" "}
                     <Box component="span" fontWeight={700} color={textPrimary}>
                       {(Array.isArray(p.active_days) ? p.active_days : [0,1,2,3,4,5,6]).sort((a,b)=>a-b).map((d) => DAYS[d]).join(", ")}
@@ -547,6 +651,8 @@ export default function Settings({ dark }) {
             </Box>
           </Paper>
 
+          {!!settingsError && <Alert severity="error" sx={{ borderRadius: 2, mb: 2 }}>{settingsError}</Alert>}
+
           {/* Auto-generate Time */}
           <Paper elevation={0} sx={{ borderRadius: 3, border: `1px solid ${border}`, background: bg, mb: 2, overflow: "hidden" }}>
             <Box sx={{ px: 2.5, py: 1.5, background: bgCard, borderBottom: `1px solid ${border}`, display: "flex", alignItems: "center", gap: 1 }}>
@@ -557,12 +663,12 @@ export default function Settings({ dark }) {
               <Box flex={1}>
                 <Typography fontWeight={600} fontSize={13.5} color={textPrimary}>Daily Generation Time</Typography>
                 <Typography fontSize={12} color={textSecondary} mt={0.2}>
-                  Orders will be automatically generated at this time each day based on active subscriptions.
+                  Orders will be automatically generated at this time each day based on active subscriptions. By default, this is set to 2 hours after delivery end time.
                 </Typography>
               </Box>
               <TextField size="small" type="time"
                 value={s.auto_generate_time || ""}
-                onChange={(e) => { setS((prev) => ({ ...prev, auto_generate_time: e.target.value })); setSDirty(true); setSSaved(false) }}
+                onChange={(e) => { setSettingsError(""); setAutoGenerateTouched(true); setS((prev) => ({ ...prev, auto_generate_time: e.target.value })); setSDirty(true); setSSaved(false) }} helperText={s.auto_generate_time ? `Customers see ${formatTime12h(s.auto_generate_time)}` : (p.delivery_end ? `Suggested: ${formatTime12h(addMinutesToTime(p.delivery_end, 120))}` : "")}
                 sx={{ width: 130, "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 15, fontWeight: 700 } }} />
             </Box>
           </Paper>
@@ -606,3 +712,5 @@ export default function Settings({ dark }) {
     </Box>
   )
 }
+
+
