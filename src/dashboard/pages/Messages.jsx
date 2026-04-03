@@ -73,7 +73,7 @@ export default function Messages() {
   const [search, setSearch] = useState("")
   const [locationFilter, setLocationFilter] = useState("")
   const [blockFilter, setBlockFilter] = useState("")
-  const [dateMode, setDateMode] = useState("today")
+  const [dateMode, setDateMode] = useState("all")
   const [fromDate, setFromDate] = useState(getISTDateStr(0))
   const [toDate, setToDate] = useState(getISTDateStr(0))
   const bottomRef = useRef(null)
@@ -146,10 +146,14 @@ export default function Messages() {
   const filteredConversations = useMemo(() => {
     const today = getISTDateStr(0)
     return conversations.filter((c) => {
-      const convoDate = toISTDateStr(c.created_at)
-      const inDateRange = dateMode === "custom"
-        ? convoDate >= fromDate && convoDate <= toDate
-        : convoDate === today
+      const createdAt = new Date(c.created_at)
+      if (Number.isNaN(createdAt.getTime())) return false
+      const convoDate = toISTDateStr(createdAt)
+      const inDateRange = dateMode === "all"
+        ? true
+        : dateMode === "custom"
+          ? convoDate >= fromDate && convoDate <= toDate
+          : convoDate === today
       if (!inDateRange) return false
 
       if (locationFilter === INDIVIDUAL_VALUE && c.address_type === "apartment") return false
@@ -241,6 +245,7 @@ export default function Messages() {
               },
             }}
           >
+            <ToggleButton value="all">All</ToggleButton>
             <ToggleButton value="today">Today</ToggleButton>
             <ToggleButton value="custom">Custom</ToggleButton>
           </ToggleButtonGroup>
@@ -473,3 +478,4 @@ export default function Messages() {
     </Box>
   )
 }
+
