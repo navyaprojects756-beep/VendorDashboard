@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import API, { getToken, getRole } from "../../services/api"
+import { formatISTDateTime, getISTDate, getISTDateStr, toISTDateStr } from "../../utils/istDate"
 
 import {
   Box,
@@ -34,12 +35,10 @@ import HighlightOffIcon   from "@mui/icons-material/HighlightOff"
 import LinkOffIcon        from "@mui/icons-material/LinkOff"
 
 /* ── date helpers ── */
-const toDateStr = (d) => d.toISOString().split("T")[0]
+const toDateStr = (d) => toISTDateStr(d)
 
 const getOffset = (days) => {
-  const d = new Date()
-  d.setDate(d.getDate() + days)
-  return toDateStr(d)
+  return getISTDateStr(days)
 }
 
 const TODAY     = getOffset(0)
@@ -134,14 +133,14 @@ export default function Orders({ dark }) {
 
     // date
     const getWeekRange = () => {
-      const now = new Date()
+      const now = getISTDate(0)
       const day = now.getDay() // 0=Sun
       const mon = new Date(now); mon.setDate(now.getDate() - ((day + 6) % 7))
       const sun = new Date(mon); sun.setDate(mon.getDate() + 6)
       return { from: toDateStr(mon), to: toDateStr(sun) }
     }
     const getMonthRange = () => {
-      const now = new Date()
+      const now = getISTDate(0)
       const from = new Date(now.getFullYear(), now.getMonth(), 1)
       const to   = new Date(now.getFullYear(), now.getMonth() + 1, 0)
       return { from: toDateStr(from), to: toDateStr(to) }
@@ -927,7 +926,7 @@ export default function Orders({ dark }) {
 
                   {o.is_delivered && o.delivered_at && (
                     <Typography variant="caption" color="text.disabled" fontSize={10.5}>
-                      {new Date(o.delivered_at).toLocaleString()}
+                      {formatISTDateTime(o.delivered_at)}
                     </Typography>
                   )}
                 </Box>

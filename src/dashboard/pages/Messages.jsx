@@ -10,6 +10,7 @@ import ImageIcon        from "@mui/icons-material/Image"
 import MicIcon          from "@mui/icons-material/Mic"
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile"
 import ArrowBackIcon    from "@mui/icons-material/ArrowBack"
+import { formatISTDate, formatISTDateTime, getISTNow } from "../../utils/istDate"
 
 function msgIcon(type) {
   if (type === "image")    return <ImageIcon sx={{ fontSize: 14 }} />
@@ -21,15 +22,15 @@ function msgIcon(type) {
 function fmtTime(val) {
   if (!val) return ""
   const d = new Date(val)
-  const now = new Date()
-  const isToday = d.toDateString() === now.toDateString()
-  if (isToday) return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
-  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+  const now = getISTNow()
+  const isToday = d.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" }) === now.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })
+  if (isToday) return formatISTDateTime(val, { hour: "2-digit", minute: "2-digit" })
+  return formatISTDate(val, { day: "numeric", month: "short" })
 }
 
 function fmtFull(val) {
   if (!val) return ""
-  return new Date(val).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+  return formatISTDateTime(val)
 }
 
 function msgPreview(m) {

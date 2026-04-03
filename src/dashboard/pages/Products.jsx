@@ -11,6 +11,7 @@ import EditIcon          from "@mui/icons-material/Edit"
 import DeleteIcon        from "@mui/icons-material/Delete"
 import HistoryIcon       from "@mui/icons-material/History"
 import InventoryIcon     from "@mui/icons-material/Inventory"
+import { formatISTDate } from "../../utils/istDate"
 
 const ORDER_TYPE_LABELS = {
   subscription: "Daily",
@@ -131,7 +132,7 @@ export default function Products({ dark }) {
 
   const fmtDate = (val) => {
     if (!val) return "—"
-    return new Date(val).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    return formatISTDate(val, { day: "numeric", month: "short", year: "numeric" })
   }
 
   return (

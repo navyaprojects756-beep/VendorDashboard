@@ -11,20 +11,18 @@ import ApartmentIcon  from "@mui/icons-material/Apartment"
 import AllInboxIcon   from "@mui/icons-material/AllInbox"
 import API, { getToken } from "../../services/api"
 import Toast from "../../components/Toast"
+import { formatISTDate, getISTDateStr, parseDateOnly } from "../../utils/istDate"
 
 function fmtDate(val) {
-  if (!val) return "—"
-  // handles both ISO strings ("2026-04-02T00:00:00.000Z") and plain "YYYY-MM-DD"
-  const iso = String(val)
-  const [yr, mo, dy] = iso.slice(0, 10).split("-").map(Number)
-  return new Date(yr, mo - 1, dy).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+  if (!val) return "-"
+  return formatISTDate(val, { day: "numeric", month: "short", year: "numeric" })
 }
 
 function daysRemaining(pause) {
   if (!pause.pause_until) return null
-  const end   = new Date(String(pause.pause_until).slice(0, 10) + "T00:00:00")
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  const diff  = Math.ceil((end - today) / 86400000)
+  const end = parseDateOnly(String(pause.pause_until).slice(0, 10))
+  const today = parseDateOnly(getISTDateStr(0))
+  const diff = Math.ceil((end - today) / 86400000)
   return diff
 }
 
@@ -212,7 +210,7 @@ export default function Pauses({ dark }) {
                               ? (() => {
                                   const [yr, mo, dy] = pause.pause_until.slice(0,10).split("-").map(Number)
                                   const next = new Date(yr, mo - 1, dy + 1)
-                                  return next.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                                  return formatISTDate(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(next.getDate()).padStart(2, "0")}`, { day: "numeric", month: "short", year: "numeric" })
                                 })()
                               : "Manual"
                             }

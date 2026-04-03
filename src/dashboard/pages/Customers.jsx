@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import API, { getToken } from "../../services/api"
 import Toast from "../../components/Toast"
+import { formatISTDate, getISTDate, toISTDateStr } from "../../utils/istDate"
 
 import {
   Box, Typography, Paper, Chip, TextField, Select, MenuItem,
@@ -31,24 +32,23 @@ const toDateStr = (d) => {
   return `${y}-${m}-${dy}`
 }
 const getThisMonth = () => {
-  const now = new Date()
+  const now = getISTDate(0)
   return {
     from:  toDateStr(new Date(now.getFullYear(), now.getMonth(), 1)),
     to:    toDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
-    label: now.toLocaleString("en-IN", { month: "long", year: "numeric" }),
+    label: formatISTDate(toISTDateStr(new Date(now.getFullYear(), now.getMonth(), 1)), { month: "long", year: "numeric" }),
   }
 }
 const getLastMonth = () => {
-  const now = new Date()
+  const now = getISTDate(0)
+  const start = new Date(now.getFullYear(), now.getMonth() - 1, 1)
   return {
-    from:  toDateStr(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
+    from:  toDateStr(start),
     to:    toDateStr(new Date(now.getFullYear(), now.getMonth(), 0)),
-    label: new Date(now.getFullYear(), now.getMonth() - 1, 1)
-             .toLocaleString("en-IN", { month: "long", year: "numeric" }),
+    label: formatISTDate(toISTDateStr(start), { month: "long", year: "numeric" }),
   }
 }
-const fmtDate = (str) =>
-  new Date(str).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+const fmtDate = (str) => formatISTDate(str)
 
 const toNum = (value) => Number.parseFloat(value || 0) || 0
 const getOrderDelivery = (order) => {
