@@ -4,7 +4,7 @@ import {
   Box, Typography, Paper, Chip, CircularProgress,
   Badge, Divider, IconButton, Tooltip, TextField,
   InputAdornment, Select, MenuItem, ToggleButtonGroup,
-  ToggleButton,
+  ToggleButton, Button,
 } from "@mui/material"
 import MessageIcon from "@mui/icons-material/Message"
 import RefreshIcon from "@mui/icons-material/Refresh"
@@ -76,6 +76,8 @@ export default function Messages() {
   const [dateMode, setDateMode] = useState("all")
   const [fromDate, setFromDate] = useState(getISTDateStr(0))
   const [toDate, setToDate] = useState(getISTDateStr(0))
+  const [replyText, setReplyText] = useState("")
+  const [sendingReply, setSendingReply] = useState(false)
   const bottomRef = useRef(null)
 
   const loadConvos = async (silent = false) => {
@@ -110,6 +112,10 @@ export default function Messages() {
 
   useEffect(() => {
     if (selected) loadThread(selected)
+  }, [selected])
+
+  useEffect(() => {
+    setReplyText("")
   }, [selected])
 
   useEffect(() => {
@@ -175,6 +181,33 @@ export default function Messages() {
 
   const showList = !isMobile || !selected
   const showThread = !isMobile || !!selected
+
+  const sendReply = async () => {
+    const text = replyText.trim()
+    if (!selected || !text || sendingReply) return
+    setSendingReply(true)
+    try {
+      const r = await API.post(
+        `/messages/thread/${encodeURIComponent(selected)}/reply?token=${getToken()}`,
+        { text }
+      )
+      if (r.data?.message) {
+        setThread((prev) => [...prev, r.data.message])
+        setConversations((prev) => prev.map((c) =>
+          c.phone === selected
+            ? { ...c, content: text, direction: "outbound", message_type: "text", created_at: r.data.message.created_at }
+            : c
+        ))
+      } else {
+        await loadThread(selected)
+      }
+      setReplyText("")
+    } catch (err) {
+      window.alert(err.response?.data?.message || "Failed to send reply")
+    } finally {
+      setSendingReply(false)
+    }
+  }
 
   return (
     <Box sx={{ maxWidth: 1080, margin: "auto", px: { xs: 1, sm: 2 }, py: 3 }}>
@@ -465,9 +498,49 @@ export default function Messages() {
                   <div ref={bottomRef} />
                 </Box>
 
-                <Box sx={{ px: 2, py: 1, borderTop: "1px solid #e5e7eb", background: "#fafafa" }}>
-                  <Typography fontSize={12} color="text.secondary">
-                    Replies are sent automatically. The customer also gets the vendor follow-up note on WhatsApp.
+                <Box sx={{ px: 1.5, py: 1.2, borderTop: "1px solid #e5e7eb", background: "#fafafa" }}>
+                  <Box display="flex" gap={1} alignItems="flex-end">
+                    <TextField
+                      fullWidth
+                      size="small"
+                      multiline
+                      maxRows={4}
+                      placeholder="Type a reply..."
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault()
+                          sendReply()
+                        }
+                      }}
+                      sx={{
+                        "& .MuiOutlinedInput-root": {
+                          borderRadius: 3,
+                          background: "white",
+                          fontSize: 13,
+                        },
+                      }}
+                    />
+                    <Button
+                      variant="contained"
+                      onClick={sendReply}
+                      disabled={!replyText.trim() || sendingReply}
+                      sx={{
+                        minWidth: 90,
+                        height: 40,
+                        textTransform: "none",
+                        fontWeight: 700,
+                        borderRadius: 3,
+                        background: "#22c55e",
+                        "&:hover": { background: "#16a34a" },
+                      }}
+                    >
+                      {sendingReply ? "Sending..." : "Send"}
+                    </Button>
+                  </Box>
+                  <Typography fontSize={11.5} color="text.secondary" mt={0.8}>
+                    Vendor replies are sent directly on WhatsApp while the customer conversation window is active.
                   </Typography>
                 </Box>
               </>
