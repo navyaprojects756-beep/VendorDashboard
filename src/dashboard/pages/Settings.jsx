@@ -510,6 +510,20 @@ export default function Settings({ dark }) {
             <Divider />
             <Box sx={{ px: 2.5, py: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
               <Box flex={1}>
+                <Typography fontWeight={600} fontSize={13.5} color={textPrimary}>Quick Order Delivery Charge (₹)</Typography>
+                <Typography fontSize={12} color={textSecondary} mt={0.2}>
+                  Charged once per quick / one-time order. Set to 0 for free delivery.
+                </Typography>
+              </Box>
+              <TextField size="small" type="number"
+                value={s.adhoc_delivery_charge ?? "0"}
+                onChange={(e) => { setS((prev) => ({ ...prev, adhoc_delivery_charge: e.target.value })); setSDirty(true); setSSaved(false) }}
+                slotProps={{ input: { min: 0, step: 1, startAdornment: <InputAdornment position="start"><Typography fontSize={14} fontWeight={700}>₹</Typography></InputAdornment> } }}
+                sx={{ width: 110, "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 15, fontWeight: 700 } }} />
+            </Box>
+            <Divider />
+            <Box sx={{ px: 2.5, py: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
+              <Box flex={1}>
                 <Typography fontWeight={600} fontSize={13.5} color={textPrimary}>Vendor Contact Phone</Typography>
                 <Typography fontSize={12} color={textSecondary} mt={0.2}>
                   Shown in WhatsApp auto-reply when a customer sends an unrecognised message.
