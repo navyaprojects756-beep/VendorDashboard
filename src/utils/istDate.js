@@ -41,5 +41,11 @@ export function formatISTDateTime(value, options = { day: "numeric", month: "sho
   if (!value) return ""
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ""
-  return new Intl.DateTimeFormat("en-IN", { timeZone: IST_TIME_ZONE, ...options }).format(date)
+  const hasHour = Object.prototype.hasOwnProperty.call(options || {}, "hour")
+  const finalOptions = {
+    timeZone: IST_TIME_ZONE,
+    ...(hasHour ? { hour12: true } : {}),
+    ...options,
+  }
+  return new Intl.DateTimeFormat("en-IN", finalOptions).format(date)
 }

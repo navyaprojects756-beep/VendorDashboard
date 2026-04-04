@@ -1,17 +1,15 @@
-import { useEffect, useMemo, useState } from "react"
+﻿import { useEffect, useMemo, useState } from "react"
 import API, { getToken } from "../../services/api"
-import { formatISTDate, formatISTDateTime, getISTDate, getISTDateStr, toISTDateStr } from "../../utils/istDate"
-
+import { formatISTDate, formatISTDateTime, getISTDate, getISTDateStr } from "../../utils/istDate"
 import {
-  Alert,
   Box,
   Button,
   Chip,
   CircularProgress,
+  Collapse,
   Dialog,
   DialogContent,
   DialogTitle,
-  Divider,
   IconButton,
   InputAdornment,
   MenuItem,
@@ -21,17 +19,14 @@ import {
   TextField,
   ToggleButton,
   ToggleButtonGroup,
-  Tooltip,
   Typography,
 } from "@mui/material"
-
 import PaymentsIcon from "@mui/icons-material/Payments"
 import SearchIcon from "@mui/icons-material/Search"
 import ApartmentIcon from "@mui/icons-material/Apartment"
 import HomeIcon from "@mui/icons-material/Home"
 import GridViewIcon from "@mui/icons-material/GridView"
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday"
-import VisibilityIcon from "@mui/icons-material/Visibility"
 import CheckCircleIcon from "@mui/icons-material/CheckCircle"
 import BlockIcon from "@mui/icons-material/Block"
 import RefreshIcon from "@mui/icons-material/Refresh"
@@ -39,6 +34,7 @@ import AttachFileIcon from "@mui/icons-material/AttachFile"
 import PersonIcon from "@mui/icons-material/Person"
 import PhoneIcon from "@mui/icons-material/Phone"
 import CloseIcon from "@mui/icons-material/Close"
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
 
 const INDIVIDUAL_VALUE = "__individual__"
 
@@ -51,37 +47,51 @@ const toDateStr = (d) => {
 
 const getThisMonthRange = () => {
   const now = getISTDate(0)
-  return {
-    from: toDateStr(new Date(now.getFullYear(), now.getMonth(), 1)),
-    to: toDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
-    label: formatISTDate(toISTDateStr(new Date(now.getFullYear(), now.getMonth(), 1)), { month: "long", year: "numeric" }),
-  }
+  const from = toDateStr(new Date(now.getFullYear(), now.getMonth(), 1))
+  const to = toDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 0))
+  return { from, to, label: formatISTDate(from, { month: "long", year: "numeric" }) }
 }
 
 function toNum(value) {
   return Number.parseFloat(value || 0) || 0
 }
 
-function PaymentTile({ label, value, color, bg, dark }) {
+function paymentStatus(payment) {
+  if (payment.is_revoked) return "rejected"
+  if (payment.is_verified) return "accepted"
+  return "pending"
+}
+
+function statusChipProps(status) {
+  if (status === "accepted") return { label: "Accepted", color: "success" }
+  if (status === "rejected") return { label: "Rejected", color: "error" }
+  return { label: "Pending", color: "warning" }
+}
+
+function PaymentTile({ label, value, tone, dark }) {
   const border = dark ? "#1e293b" : "#e5e7eb"
+  const backgrounds = {
+    blue: dark ? "#0f172a" : "#ffffff",
+    green: dark ? "#052e16" : "#f0fdf4",
+    orange: dark ? "#431407" : "#fff7ed",
+  }
+  const colors = {
+    blue: "#2563eb",
+    green: "#16a34a",
+    orange: "#ea580c",
+  }
   return (
-    <Paper elevation={0} sx={{ flex: "1 1 180px", p: 1.6, borderRadius: 3, border: `1px solid ${border}`, background: dark ? "#0f172a" : "#fff" }}>
-      <Typography fontSize={11} color={dark ? "#94a3b8" : "#6b7280"}>{label}</Typography>
-      <Typography fontWeight={800} fontSize={24} sx={{ color, lineHeight: 1.1, mt: 0.4 }}>
+    <Paper elevation={0} sx={{ p: 2, borderRadius: 3, border: `1px solid ${border}`, background: backgrounds[tone], minWidth: 0 }}>
+      <Typography fontSize={12} color={dark ? "#94a3b8" : "#6b7280"}>{label}</Typography>
+      <Typography fontWeight={800} fontSize={{ xs: 24, sm: 28 }} sx={{ color: colors[tone], mt: 0.5, lineHeight: 1.1 }}>
         Rs.{value.toFixed(0)}
       </Typography>
-      <Box sx={{ mt: 1, height: 6, borderRadius: 999, background: bg }} />
     </Paper>
   )
 }
 
-function statusChip(payment) {
-  if (payment.is_revoked) return { label: "Rejected", color: "error" }
-  if (payment.is_verified) return { label: "Accepted", color: "success" }
-  return { label: "Pending", color: "warning" }
-}
-
 export default function Payments({ dark }) {
+  const monthRange = getThisMonthRange()
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [payments, setPayments] = useState([])
@@ -89,16 +99,16 @@ export default function Payments({ dark }) {
   const [search, setSearch] = useState("")
   const [locationFilter, setLocationFilter] = useState("")
   const [blockFilter, setBlockFilter] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
   const [dateMode, setDateMode] = useState("month")
-  const monthRange = getThisMonthRange()
   const [fromDate, setFromDate] = useState(monthRange.from)
   const [toDate, setToDate] = useState(monthRange.to)
   const [previewImage, setPreviewImage] = useState("")
   const [actionBusy, setActionBusy] = useState("")
+  const [expanded, setExpanded] = useState({})
 
   const border = dark ? "#1e293b" : "#e5e7eb"
   const bg = dark ? "#0f172a" : "#ffffff"
-  const bgCard = dark ? "#111827" : "#f9fafb"
   const textPrimary = dark ? "#f1f5f9" : "#111827"
   const textSecondary = dark ? "#94a3b8" : "#6b7280"
 
@@ -152,32 +162,32 @@ export default function Payments({ dark }) {
     return [...new Set(sourceRows.filter((row) => row.apartment_name === locationFilter).map((row) => row.block_name).filter(Boolean))]
   }, [sourceRows, locationFilter])
 
-  const matchFilters = (row) => {
+  const matchesBaseFilters = (row) => {
     if (locationFilter === INDIVIDUAL_VALUE && row.address_type === "apartment") return false
     if (locationFilter && locationFilter !== INDIVIDUAL_VALUE && row.apartment_name !== locationFilter) return false
     if (blockFilter && row.block_name !== blockFilter) return false
     if (!search.trim()) return true
     const q = search.toLowerCase()
-    return [
-      row.customer_name,
-      row.customer_phone,
-      row.address,
-      row.apartment_name,
-      row.block_name,
-      row.payment_method,
-      row.notes,
-    ].some((value) => String(value || "").toLowerCase().includes(q))
+    return [row.customer_name, row.customer_phone, row.address, row.apartment_name, row.block_name, row.payment_method, row.notes]
+      .some((value) => String(value || "").toLowerCase().includes(q))
   }
 
-  const filteredCustomerTotals = useMemo(
-    () => customerTotals.filter(matchFilters),
-    [customerTotals, search, locationFilter, blockFilter]
-  )
+  const filteredPayments = useMemo(() => {
+    return payments.filter((payment) => matchesBaseFilters(payment) && (statusFilter === "all" || paymentStatus(payment) === statusFilter))
+  }, [payments, search, locationFilter, blockFilter, statusFilter])
 
-  const filteredPayments = useMemo(
-    () => payments.filter(matchFilters),
-    [payments, search, locationFilter, blockFilter]
-  )
+  const visibleCustomerIds = useMemo(() => {
+    if (statusFilter === "all") return null
+    return new Set(filteredPayments.map((payment) => payment.customer_id).filter(Boolean))
+  }, [filteredPayments, statusFilter])
+
+  const filteredCustomerTotals = useMemo(() => {
+    return customerTotals.filter((row) => {
+      if (!matchesBaseFilters(row)) return false
+      if (!visibleCustomerIds) return true
+      return visibleCustomerIds.has(row.customer_id)
+    })
+  }, [customerTotals, search, locationFilter, blockFilter, visibleCustomerIds])
 
   const totals = useMemo(() => {
     return filteredCustomerTotals.reduce((acc, row) => {
@@ -198,213 +208,167 @@ export default function Payments({ dark }) {
     }
   }
 
+  const toggleExpanded = (paymentId) => setExpanded((prev) => ({ ...prev, [paymentId]: !prev[paymentId] }))
+  const expandAll = () => {
+    const next = {}
+    filteredPayments.forEach((payment) => { next[payment.payment_id] = true })
+    setExpanded(next)
+  }
+  const collapseAll = () => {
+    const next = {}
+    filteredPayments.forEach((payment) => { next[payment.payment_id] = false })
+    setExpanded(next)
+  }
+
   return (
-    <Box sx={{ maxWidth: 1100, margin: "auto", px: { xs: 1, sm: 2 }, py: 3 }}>
-      <Box display="flex" alignItems="center" justifyContent="space-between" mb={3} gap={2} flexWrap="wrap">
+    <Box sx={{ maxWidth: 1180, margin: "auto", px: { xs: 1, sm: 2 }, py: 3 }}>
+      <Box display="flex" alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" mb={2} gap={2} flexWrap="wrap">
         <Box display="flex" alignItems="center" gap={1.2}>
-          <Box sx={{ width: 36, height: 36, borderRadius: "10px", background: "linear-gradient(135deg,#0f766e,#14b8a6)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Box sx={{ width: 38, height: 38, borderRadius: "12px", background: "linear-gradient(135deg,#0f766e,#14b8a6)", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <PaymentsIcon sx={{ fontSize: 18, color: "white" }} />
           </Box>
           <Box>
-            <Typography fontWeight={700} fontSize={17} color={textPrimary} lineHeight={1.2}>Payments</Typography>
-            <Typography fontSize={12} color={textSecondary}>Track received payments, outstanding balances, and proof attachments</Typography>
+            <Typography fontWeight={800} fontSize={18} color={textPrimary}>Payments</Typography>
+            <Typography fontSize={12.5} color={textSecondary}>Track payment history, approvals, rejected proofs, and outstanding balances.</Typography>
           </Box>
         </Box>
-        <Button
-          size="small"
-          startIcon={<RefreshIcon />}
-          variant="outlined"
-          onClick={() => loadPayments(true)}
-          disabled={refreshing}
-          sx={{ borderRadius: 2, textTransform: "none" }}
-        >
-          Refresh
-        </Button>
+        <Stack direction="row" spacing={1} flexWrap="wrap">
+          <Button size="small" variant="outlined" startIcon={<RefreshIcon />} onClick={() => loadPayments(true)} disabled={refreshing} sx={{ borderRadius: 2, textTransform: "none" }}>Refresh</Button>
+          <Button size="small" variant="outlined" onClick={expandAll} sx={{ borderRadius: 2, textTransform: "none" }}>Expand All</Button>
+          <Button size="small" variant="outlined" onClick={collapseAll} sx={{ borderRadius: 2, textTransform: "none" }}>Collapse All</Button>
+        </Stack>
       </Box>
 
-      <Box display="flex" gap={2} mb={2} flexWrap="wrap">
-        <PaymentTile label="Total Amount" value={totals.totalBilled} color="#2563eb" bg={dark ? "#172554" : "#dbeafe"} dark={dark} />
-        <PaymentTile label="Received Amount" value={totals.received} color="#16a34a" bg={dark ? "#14532d" : "#dcfce7"} dark={dark} />
-        <PaymentTile label="Outstanding Amount" value={totals.outstanding} color="#ea580c" bg={dark ? "#431407" : "#ffedd5"} dark={dark} />
+      <Box display="grid" gridTemplateColumns={{ xs: "1fr", md: "repeat(3, 1fr)" }} gap={1.5} mb={2}>
+        <PaymentTile label="Total Amount" value={totals.totalBilled} tone="blue" dark={dark} />
+        <PaymentTile label="Received Amount" value={totals.received} tone="green" dark={dark} />
+        <PaymentTile label="Outstanding Amount" value={totals.outstanding} tone="orange" dark={dark} />
       </Box>
 
       <Paper elevation={0} sx={{ p: 1.5, mb: 2, borderRadius: 3, border: `1px solid ${border}`, background: bg }}>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={1.2} alignItems={{ xs: "stretch", md: "center" }}>
-          <TextField
-            size="small"
-            placeholder="Search customer, phone or address..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            InputProps={{
-              startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: textSecondary }} /></InputAdornment>
-            }}
-            sx={{ flex: "1 1 240px", "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }}
-          />
+        <Stack spacing={1.2}>
+          <Stack direction={{ xs: "column", md: "row" }} spacing={1.2}>
+            <TextField
+              size="small"
+              placeholder="Search name, phone or address..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: textSecondary }} /></InputAdornment> }}
+              sx={{ flex: 1, "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }}
+            />
+            <Select
+              size="small"
+              value={locationFilter}
+              displayEmpty
+              onChange={(e) => { setLocationFilter(e.target.value); setBlockFilter("") }}
+              startAdornment={<InputAdornment position="start">{locationFilter === INDIVIDUAL_VALUE ? <HomeIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /> : <ApartmentIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} />}</InputAdornment>}
+              sx={{ minWidth: { xs: "100%", md: 210 }, borderRadius: 2, fontSize: 13 }}
+            >
+              <MenuItem value="">All Locations</MenuItem>
+              <MenuItem value={INDIVIDUAL_VALUE}>Individual Houses</MenuItem>
+              {apartments.map((name) => <MenuItem key={name} value={name}>{name}</MenuItem>)}
+            </Select>
+            <Select
+              size="small"
+              value={blockFilter}
+              displayEmpty
+              disabled={!locationFilter || locationFilter === INDIVIDUAL_VALUE}
+              onChange={(e) => setBlockFilter(e.target.value)}
+              startAdornment={<InputAdornment position="start"><GridViewIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /></InputAdornment>}
+              sx={{ minWidth: { xs: "100%", md: 180 }, borderRadius: 2, fontSize: 13 }}
+            >
+              <MenuItem value="">All Blocks</MenuItem>
+              {blocks.map((name) => <MenuItem key={name} value={name}>{name}</MenuItem>)}
+            </Select>
+          </Stack>
 
-          <Select
-            size="small"
-            value={locationFilter}
-            displayEmpty
-            onChange={(e) => { setLocationFilter(e.target.value); setBlockFilter("") }}
-            startAdornment={<InputAdornment position="start">{locationFilter === INDIVIDUAL_VALUE ? <HomeIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /> : <ApartmentIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} />}</InputAdornment>}
-            sx={{ minWidth: 170, borderRadius: 2, fontSize: 13 }}
-          >
-            <MenuItem value="">All Locations</MenuItem>
-            <MenuItem value={INDIVIDUAL_VALUE}>Individual Houses</MenuItem>
-            {apartments.map((a) => <MenuItem key={a} value={a}>{a}</MenuItem>)}
-          </Select>
-
-          <Select
-            size="small"
-            value={blockFilter}
-            displayEmpty
-            disabled={!locationFilter || locationFilter === INDIVIDUAL_VALUE}
-            onChange={(e) => setBlockFilter(e.target.value)}
-            startAdornment={<InputAdornment position="start"><GridViewIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /></InputAdornment>}
-            sx={{ minWidth: 150, borderRadius: 2, fontSize: 13 }}
-          >
-            <MenuItem value="">All Blocks</MenuItem>
-            {blocks.map((b) => <MenuItem key={b} value={b}>{b}</MenuItem>)}
-          </Select>
-        </Stack>
-
-        <Stack direction={{ xs: "column", md: "row" }} spacing={1.2} mt={1.5} alignItems={{ xs: "stretch", md: "center" }}>
-          <ToggleButtonGroup
-            exclusive
-            value={dateMode}
-            onChange={(_, value) => value && setDateMode(value)}
-            size="small"
-            sx={{ flexWrap: "wrap" }}
-          >
-            <ToggleButton value="today">Today</ToggleButton>
-            <ToggleButton value="month">This Month</ToggleButton>
-            <ToggleButton value="custom">Custom</ToggleButton>
-          </ToggleButtonGroup>
-          {dateMode === "custom" && (
-            <>
-              <TextField
-                size="small"
-                type="date"
-                label="From"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-                sx={{ width: 160 }}
-              />
-              <TextField
-                size="small"
-                type="date"
-                label="To"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-                sx={{ width: 160 }}
-              />
-            </>
-          )}
-          <Chip
-            icon={<CalendarTodayIcon />}
-            label={dateMode === "month" ? monthRange.label : `${formatISTDate(fromDate)} - ${formatISTDate(toDate)}`}
-            sx={{ borderRadius: 2, fontWeight: 600 }}
-          />
+          <Stack direction={{ xs: "column", md: "row" }} spacing={1.2} alignItems={{ xs: "stretch", md: "center" }}>
+            <ToggleButtonGroup size="small" exclusive value={dateMode} onChange={(_, value) => value && setDateMode(value)} sx={{ flexWrap: "wrap" }}>
+              <ToggleButton value="today">Today</ToggleButton>
+              <ToggleButton value="month">This Month</ToggleButton>
+              <ToggleButton value="custom">Custom</ToggleButton>
+            </ToggleButtonGroup>
+            <Select size="small" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} sx={{ minWidth: { xs: "100%", md: 190 }, borderRadius: 2, fontSize: 13 }}>
+              <MenuItem value="all">All Payments</MenuItem>
+              <MenuItem value="pending">Pending To Accept</MenuItem>
+              <MenuItem value="accepted">Accepted</MenuItem>
+              <MenuItem value="rejected">Rejected</MenuItem>
+            </Select>
+            {dateMode === "custom" ? (
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2}>
+                <TextField size="small" type="date" label="From" value={fromDate} onChange={(e) => setFromDate(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ width: 160 }} />
+                <TextField size="small" type="date" label="To" value={toDate} onChange={(e) => setToDate(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ width: 160 }} />
+              </Stack>
+            ) : (
+              <Chip icon={<CalendarTodayIcon />} label={dateMode === "month" ? monthRange.label : formatISTDate(fromDate)} sx={{ borderRadius: 2, fontWeight: 600, alignSelf: { xs: "flex-start", md: "center" } }} />
+            )}
+          </Stack>
         </Stack>
       </Paper>
 
       {loading ? (
         <Box py={10} textAlign="center"><CircularProgress size={26} /></Box>
+      ) : filteredPayments.length === 0 ? (
+        <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: `1px solid ${border}`, background: bg }}>
+          <Typography fontWeight={700} color={textPrimary}>No payments found for these filters</Typography>
+          <Typography fontSize={13} color={textSecondary} mt={0.6}>Try changing the month, status, location, or search filters.</Typography>
+        </Paper>
       ) : (
-        <Stack spacing={1.5}>
-          {filteredPayments.length === 0 && (
-            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: `1px solid ${border}`, background: bg }}>
-              <Typography fontWeight={700} color={textPrimary}>No payment history found</Typography>
-              <Typography fontSize={13} color={textSecondary} mt={0.6}>
-                Try changing the date range or location filters.
-              </Typography>
-            </Paper>
-          )}
-
+        <Stack spacing={1.3}>
           {filteredPayments.map((payment) => {
-            const status = statusChip(payment)
+            const status = paymentStatus(payment)
+            const chip = statusChipProps(status)
+            const isExpanded = !!expanded[payment.payment_id]
             const busyVerify = actionBusy === `verify-${payment.payment_id}`
             const busyRevoke = actionBusy === `revoke-${payment.payment_id}`
             return (
-              <Paper key={payment.payment_id} elevation={0} sx={{ p: 2, borderRadius: 3, border: `1px solid ${border}`, background: bg }}>
-                <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} justifyContent="space-between">
-                  <Box flex={1}>
-                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" mb={0.8}>
-                      <Typography fontWeight={800} color={textPrimary} fontSize={16}>Rs.{toNum(payment.amount).toFixed(0)}</Typography>
-                      <Chip size="small" label={status.label} color={status.color} />
-                      <Chip size="small" variant="outlined" label={payment.payment_method || "other"} />
-                      <Typography fontSize={12} color={textSecondary}>
-                        {formatISTDate(payment.payment_date)} · {formatISTDateTime(payment.created_at, { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}
-                      </Typography>
-                    </Stack>
+              <Paper key={payment.payment_id} elevation={0} sx={{ borderRadius: 3, border: `1px solid ${border}`, background: bg, overflow: "hidden" }}>
+                <Box sx={{ px: 1.5, py: 1.4 }}>
+                  <Stack direction={{ xs: "column", md: "row" }} spacing={1.2} justifyContent="space-between" alignItems={{ xs: "flex-start", md: "center" }}>
+                    <Box minWidth={0} flex={1}>
+                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" mb={0.8}>
+                        <Typography fontWeight={800} color={textPrimary} fontSize={18}>Rs.{toNum(payment.amount).toFixed(0)}</Typography>
+                        <Chip size="small" label={chip.label} color={chip.color} />
+                        <Chip size="small" variant="outlined" label={payment.payment_method || "other"} />
+                      </Stack>
+                      <Typography fontWeight={700} color={textPrimary} fontSize={14}><PersonIcon sx={{ fontSize: 15, verticalAlign: "-2px", mr: 0.4 }} />{payment.customer_name || "Customer"}</Typography>
+                      <Typography fontSize={12.5} color={textSecondary}><PhoneIcon sx={{ fontSize: 14, verticalAlign: "-2px", mr: 0.4 }} />{payment.customer_phone}</Typography>
+                      <Typography fontSize={12} color={textSecondary} mt={0.35}>{formatISTDate(payment.payment_date)} - {formatISTDateTime(payment.created_at, { hour: "2-digit", minute: "2-digit" })}</Typography>
+                    </Box>
+                    <Button size="small" onClick={() => toggleExpanded(payment.payment_id)} endIcon={<ExpandMoreIcon sx={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }} />} sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}>
+                      {isExpanded ? "Collapse" : "Expand"}
+                    </Button>
+                  </Stack>
+                </Box>
 
-                    <Stack direction={{ xs: "column", sm: "row" }} spacing={2} flexWrap="wrap">
-                      <Box>
-                        <Typography fontWeight={700} color={textPrimary}><PersonIcon sx={{ fontSize: 15, verticalAlign: "-2px", mr: 0.4 }} />{payment.customer_name || "Customer"}</Typography>
-                        <Typography fontSize={13} color={textSecondary}><PhoneIcon sx={{ fontSize: 14, verticalAlign: "-2px", mr: 0.4 }} />{payment.customer_phone}</Typography>
-                        <Typography fontSize={13} color={textSecondary}>{payment.address || "Address not available"}</Typography>
-                      </Box>
-                      <Box>
-                        {payment.period_from && payment.period_to && (
-                          <Typography fontSize={13} color={textSecondary}>
-                            Covers: <Box component="span" fontWeight={700} color={textPrimary}>{formatISTDate(payment.period_from)} - {formatISTDate(payment.period_to)}</Box>
-                          </Typography>
+                <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                  <Box sx={{ px: 1.5, pb: 1.5, pt: 0, borderTop: `1px solid ${border}` }}>
+                    <Stack spacing={1.2} mt={1.4}>
+                      <Typography fontSize={13} color={textSecondary}>{payment.address || "Address not available"}</Typography>
+                      {payment.period_from && payment.period_to && (
+                        <Typography fontSize={13} color={textSecondary}>Covers: <Box component="span" fontWeight={700} color={textPrimary}>{formatISTDate(payment.period_from)} to {formatISTDate(payment.period_to)}</Box></Typography>
+                      )}
+                      {!!payment.notes && (
+                        <Typography fontSize={13} color={textSecondary}>Note: <Box component="span" color={textPrimary}>{payment.notes}</Box></Typography>
+                      )}
+                      <Stack direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }}>
+                        {payment.screenshot_url ? (
+                          <Button size="small" variant="outlined" startIcon={<AttachFileIcon />} onClick={() => setPreviewImage(payment.screenshot_url)} sx={{ borderRadius: 2, textTransform: "none", alignSelf: "flex-start" }}>Open Attachment</Button>
+                        ) : (
+                          <Chip size="small" variant="outlined" label="No attachment" sx={{ alignSelf: "flex-start" }} />
                         )}
-                        {!!payment.notes && (
-                          <Typography fontSize={13} color={textSecondary} mt={0.5}>
-                            Note: <Box component="span" color={textPrimary}>{payment.notes}</Box>
-                          </Typography>
-                        )}
-                      </Box>
+                        <Stack direction="row" spacing={1} flexWrap="wrap">
+                          {(!payment.is_verified || payment.is_revoked) && (
+                            <Button size="small" variant="contained" startIcon={<CheckCircleIcon />} disabled={busyVerify || busyRevoke} onClick={() => handleAction(payment.payment_id, "verify")} sx={{ borderRadius: 2, textTransform: "none", background: "#16a34a" }}>Accept</Button>
+                          )}
+                          {!payment.is_revoked && (
+                            <Button size="small" variant="outlined" color="error" startIcon={<BlockIcon />} disabled={busyVerify || busyRevoke} onClick={() => handleAction(payment.payment_id, "revoke")} sx={{ borderRadius: 2, textTransform: "none" }}>Reject</Button>
+                          )}
+                        </Stack>
+                      </Stack>
                     </Stack>
                   </Box>
-
-                  <Stack spacing={1} alignItems={{ xs: "stretch", md: "flex-end" }} minWidth={{ md: 180 }}>
-                    {payment.screenshot_url ? (
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        startIcon={<AttachFileIcon />}
-                        onClick={() => setPreviewImage(payment.screenshot_url)}
-                        sx={{ borderRadius: 2, textTransform: "none" }}
-                      >
-                        View Attachment
-                      </Button>
-                    ) : (
-                      <Chip size="small" variant="outlined" label="No attachment" />
-                    )}
-
-                    <Stack direction="row" spacing={1} justifyContent={{ xs: "flex-start", md: "flex-end" }}>
-                      {(!payment.is_verified || payment.is_revoked) && (
-                        <Button
-                          size="small"
-                          variant="contained"
-                          startIcon={<CheckCircleIcon />}
-                          disabled={busyVerify || busyRevoke}
-                          onClick={() => handleAction(payment.payment_id, "verify")}
-                          sx={{ borderRadius: 2, textTransform: "none", background: "#16a34a" }}
-                        >
-                          Accept
-                        </Button>
-                      )}
-                      {!payment.is_revoked && (
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          color="error"
-                          startIcon={<BlockIcon />}
-                          disabled={busyVerify || busyRevoke}
-                          onClick={() => handleAction(payment.payment_id, "revoke")}
-                          sx={{ borderRadius: 2, textTransform: "none" }}
-                        >
-                          Reject
-                        </Button>
-                      )}
-                    </Stack>
-                  </Stack>
-                </Stack>
+                </Collapse>
               </Paper>
             )
           })}
@@ -417,11 +381,10 @@ export default function Payments({ dark }) {
           <IconButton onClick={() => setPreviewImage("")}><CloseIcon /></IconButton>
         </DialogTitle>
         <DialogContent dividers sx={{ textAlign: "center", background: dark ? "#0f172a" : "#fff" }}>
-          {previewImage ? (
-            <Box component="img" src={previewImage} alt="Payment proof" sx={{ maxWidth: "100%", maxHeight: "75vh", borderRadius: 2 }} />
-          ) : null}
+          {previewImage ? <Box component="img" src={previewImage} alt="Payment proof" sx={{ maxWidth: "100%", maxHeight: "75vh", borderRadius: 2 }} /> : null}
         </DialogContent>
       </Dialog>
     </Box>
   )
 }
+
