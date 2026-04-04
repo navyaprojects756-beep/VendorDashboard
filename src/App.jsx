@@ -13,6 +13,7 @@ import Pauses     from "./dashboard/pages/Pauses"
 import Products   from "./dashboard/pages/Products"
 import Messages   from "./dashboard/pages/Messages"
 import Payments   from "./dashboard/pages/Payments"
+import Notices    from "./dashboard/pages/Notices"
 
 import HomePage from "./company/HomePage"
 import AboutPage from "./company/AboutPage"
@@ -56,6 +57,7 @@ function VendorDashboard() {
       if(page==="pauses")     return <Pauses dark={dark}/>
       if(page==="products")   return <Products dark={dark}/>
       if(page==="messages")   return <Messages dark={dark}/>
+      if(page==="notices")    return <Notices dark={dark}/>
     }
     // delivery role falls back to orders for any other page
     return <Orders dark={dark}/>
@@ -89,3 +91,5 @@ export default function App(){
     </Routes>
   )
 }
+
+

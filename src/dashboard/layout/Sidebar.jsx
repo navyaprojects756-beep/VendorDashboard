@@ -13,6 +13,7 @@ import PauseCircleIcon   from "@mui/icons-material/PauseCircle"
 import InventoryIcon     from "@mui/icons-material/Inventory"
 import MessageIcon       from "@mui/icons-material/Message"
 import PaymentsIcon      from "@mui/icons-material/Payments"
+import CampaignIcon      from "@mui/icons-material/Campaign"
 
 const ALL_MENU = [
   { key: "orders",     label: "Orders",             icon: <DashboardIcon fontSize="small" />,  roles: ["admin","delivery"] },
@@ -20,6 +21,7 @@ const ALL_MENU = [
   { key: "payments",   label: "Payments",           icon: <PaymentsIcon fontSize="small" />,   roles: ["admin"] },
   { key: "products",   label: "Products",           icon: <InventoryIcon fontSize="small" />,  roles: ["admin"] },
   { key: "messages",   label: "Messages",           icon: <MessageIcon fontSize="small" />,    roles: ["admin"] },
+  { key: "notices",    label: "Notices",            icon: <CampaignIcon fontSize="small" />,   roles: ["admin"] },
   { key: "pauses",     label: "Pauses",             icon: <PauseCircleIcon fontSize="small" />,roles: ["admin"] },
   { key: "apartments", label: "Apartments & Blocks", icon: <ApartmentIcon fontSize="small" />, roles: ["admin"] },
   { key: "settings",   label: "Settings",           icon: <SettingsIcon fontSize="small" />,   roles: ["admin"] },
@@ -168,3 +170,6 @@ export default function Sidebar({ open, setOpen, page, setPage, dark, role = "ad
     </Drawer>
   )
 }
+
+
+
