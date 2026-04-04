@@ -27,6 +27,7 @@ import VisibilityIcon     from "@mui/icons-material/Visibility"
 import ContentCopyIcon    from "@mui/icons-material/ContentCopy"
 import WhatsAppIcon       from "@mui/icons-material/WhatsApp"
 import ShareIcon          from "@mui/icons-material/Share"
+import VerifiedIcon       from "@mui/icons-material/Verified"
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
@@ -588,6 +589,18 @@ export default function Settings({ dark }) {
               checked={!!s.show_phone_numbers}
               onChange={() => toggleS("show_phone_numbers")}
               color="#7c3aed"
+              dark={dark}
+            />
+          </Section>
+
+          <Section title="Customer Payments" icon={<VerifiedIcon fontSize="small" />} color="#0f766e" dark={dark}>
+            <SettingRow
+              icon={<VerifiedIcon sx={{ fontSize: 17 }} />}
+              label="Payment Proof Required"
+              desc="If turned on, customers must send a payment screenshot on WhatsApp and the Skip option is removed."
+              checked={!!s.payment_proof_required}
+              onChange={() => toggleS("payment_proof_required")}
+              color="#0f766e"
               dark={dark}
             />
           </Section>

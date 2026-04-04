@@ -12,6 +12,7 @@ import Customers  from "./dashboard/pages/Customers"
 import Pauses     from "./dashboard/pages/Pauses"
 import Products   from "./dashboard/pages/Products"
 import Messages   from "./dashboard/pages/Messages"
+import Payments   from "./dashboard/pages/Payments"
 
 import HomePage from "./company/HomePage"
 import AboutPage from "./company/AboutPage"
@@ -51,6 +52,7 @@ function VendorDashboard() {
       if(page==="apartments") return <Apartments dark={dark}/>
       if(page==="settings")   return <Settings dark={dark}/>
       if(page==="customers")  return <Customers dark={dark}/>
+      if(page==="payments")   return <Payments dark={dark}/>
       if(page==="pauses")     return <Pauses dark={dark}/>
       if(page==="products")   return <Products dark={dark}/>
       if(page==="messages")   return <Messages dark={dark}/>
