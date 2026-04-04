@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import API, { getToken } from "../../services/api"
 import { formatISTDate, formatISTDateTime, getISTDate, getISTDateStr } from "../../utils/istDate"
 import {
@@ -68,7 +68,7 @@ function statusChipProps(status) {
   return { label: "Pending", color: "warning" }
 }
 
-function PaymentTile({ label, value, tone, dark }) {
+function PaymentTile({ label, value, tone, dark, formatter }) {
   const border = dark ? "#1e293b" : "#e5e7eb"
   const backgrounds = {
     blue: dark ? "#0f172a" : "#ffffff",
@@ -84,7 +84,7 @@ function PaymentTile({ label, value, tone, dark }) {
     <Paper elevation={0} sx={{ p: 2, borderRadius: 3, border: `1px solid ${border}`, background: backgrounds[tone], minWidth: 0 }}>
       <Typography fontSize={12} color={dark ? "#94a3b8" : "#6b7280"}>{label}</Typography>
       <Typography fontWeight={800} fontSize={{ xs: 24, sm: 28 }} sx={{ color: colors[tone], mt: 0.5, lineHeight: 1.1 }}>
-        Rs.{value.toFixed(0)}
+        {formatter ? formatter(value) : `Rs.${value.toFixed(0)}`}
       </Typography>
     </Paper>
   )
@@ -173,13 +173,18 @@ export default function Payments({ dark }) {
   }
 
   const filteredPayments = useMemo(() => {
-    return payments.filter((payment) => matchesBaseFilters(payment) && (statusFilter === "all" || paymentStatus(payment) === statusFilter))
+    return payments.filter((payment) => matchesBaseFilters(payment) && (statusFilter === "all" || statusFilter === "need_to_pay" || paymentStatus(payment) === statusFilter))
   }, [payments, search, locationFilter, blockFilter, statusFilter])
+
+  const needToPayRows = useMemo(() => {
+    return customerTotals.filter((row) => matchesBaseFilters(row) && toNum(row.outstanding) > 0)
+  }, [customerTotals, search, locationFilter, blockFilter])
 
   const visibleCustomerIds = useMemo(() => {
     if (statusFilter === "all") return null
+    if (statusFilter === "need_to_pay") return new Set(needToPayRows.map((row) => row.customer_id).filter(Boolean))
     return new Set(filteredPayments.map((payment) => payment.customer_id).filter(Boolean))
-  }, [filteredPayments, statusFilter])
+  }, [filteredPayments, needToPayRows, statusFilter])
 
   const filteredCustomerTotals = useMemo(() => {
     return customerTotals.filter((row) => {
@@ -198,6 +203,11 @@ export default function Payments({ dark }) {
     }, { totalBilled: 0, received: 0, outstanding: 0 })
   }, [filteredCustomerTotals])
 
+  const customersNeedToPay = useMemo(
+    () => filteredCustomerTotals.filter((row) => toNum(row.outstanding) > 0).length,
+    [filteredCustomerTotals]
+  )
+
   const handleAction = async (paymentId, action) => {
     setActionBusy(`${action}-${paymentId}`)
     try {
@@ -208,15 +218,26 @@ export default function Payments({ dark }) {
     }
   }
 
-  const toggleExpanded = (paymentId) => setExpanded((prev) => ({ ...prev, [paymentId]: !prev[paymentId] }))
+  const renderPayments = statusFilter === "need_to_pay" ? [] : filteredPayments
+  const renderNeedToPay = statusFilter === "need_to_pay" ? needToPayRows : []
+
+  const toggleExpanded = (key) => setExpanded((prev) => ({ ...prev, [key]: !prev[key] }))
   const expandAll = () => {
     const next = {}
-    filteredPayments.forEach((payment) => { next[payment.payment_id] = true })
+    if (statusFilter === "need_to_pay") {
+      renderNeedToPay.forEach((row) => { next[`due-${row.customer_id}`] = true })
+    } else {
+      renderPayments.forEach((payment) => { next[payment.payment_id] = true })
+    }
     setExpanded(next)
   }
   const collapseAll = () => {
     const next = {}
-    filteredPayments.forEach((payment) => { next[payment.payment_id] = false })
+    if (statusFilter === "need_to_pay") {
+      renderNeedToPay.forEach((row) => { next[`due-${row.customer_id}`] = false })
+    } else {
+      renderPayments.forEach((payment) => { next[payment.payment_id] = false })
+    }
     setExpanded(next)
   }
 
@@ -239,10 +260,11 @@ export default function Payments({ dark }) {
         </Stack>
       </Box>
 
-      <Box display="grid" gridTemplateColumns={{ xs: "1fr", md: "repeat(3, 1fr)" }} gap={1.5} mb={2}>
+      <Box display="grid" gridTemplateColumns={{ xs: "1fr", md: "repeat(4, 1fr)" }} gap={1.5} mb={2}>
         <PaymentTile label="Total Amount" value={totals.totalBilled} tone="blue" dark={dark} />
         <PaymentTile label="Received Amount" value={totals.received} tone="green" dark={dark} />
         <PaymentTile label="Outstanding Amount" value={totals.outstanding} tone="orange" dark={dark} />
+        <PaymentTile label="Customers Need To Pay" value={customersNeedToPay} tone="orange" dark={dark} formatter={(value) => `${value}`} />
       </Box>
 
       <Paper elevation={0} sx={{ p: 1.5, mb: 2, borderRadius: 3, border: `1px solid ${border}`, background: bg }}>
@@ -293,6 +315,7 @@ export default function Payments({ dark }) {
               <MenuItem value="pending">Pending To Accept</MenuItem>
               <MenuItem value="accepted">Accepted</MenuItem>
               <MenuItem value="rejected">Rejected</MenuItem>
+              <MenuItem value="need_to_pay">Need To Pay</MenuItem>
             </Select>
             {dateMode === "custom" ? (
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2}>
@@ -308,14 +331,48 @@ export default function Payments({ dark }) {
 
       {loading ? (
         <Box py={10} textAlign="center"><CircularProgress size={26} /></Box>
-      ) : filteredPayments.length === 0 ? (
+      ) : (statusFilter === "need_to_pay" ? renderNeedToPay.length === 0 : renderPayments.length === 0) ? (
         <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: `1px solid ${border}`, background: bg }}>
-          <Typography fontWeight={700} color={textPrimary}>No payments found for these filters</Typography>
+          <Typography fontWeight={700} color={textPrimary}>{statusFilter === "need_to_pay" ? "No unpaid customers found for these filters" : "No payments found for these filters"}</Typography>
           <Typography fontSize={13} color={textSecondary} mt={0.6}>Try changing the month, status, location, or search filters.</Typography>
         </Paper>
       ) : (
         <Stack spacing={1.3}>
-          {filteredPayments.map((payment) => {
+          {statusFilter === "need_to_pay" ? renderNeedToPay.map((row) => {
+            const cardKey = `due-${row.customer_id}`
+            const isExpanded = !!expanded[cardKey]
+            return (
+              <Paper key={cardKey} elevation={0} sx={{ borderRadius: 3, border: `1px solid ${border}`, background: bg, overflow: "hidden" }}>
+                <Box sx={{ px: 1.5, py: 1.4 }}>
+                  <Stack direction={{ xs: "column", md: "row" }} spacing={1.2} justifyContent="space-between" alignItems={{ xs: "flex-start", md: "center" }}>
+                    <Box minWidth={0} flex={1}>
+                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" mb={0.8}>
+                        <Typography fontWeight={800} color={textPrimary} fontSize={18}>Rs.{toNum(row.outstanding).toFixed(0)}</Typography>
+                        <Chip size="small" color="error" label="Need To Pay" />
+                      </Stack>
+                      <Typography fontWeight={700} color={textPrimary} fontSize={14}><PersonIcon sx={{ fontSize: 15, verticalAlign: "-2px", mr: 0.4 }} />{row.customer_name || "Customer"}</Typography>
+                      <Typography fontSize={12.5} color={textSecondary}><PhoneIcon sx={{ fontSize: 14, verticalAlign: "-2px", mr: 0.4 }} />{row.customer_phone}</Typography>
+                      <Typography fontSize={12} color={textSecondary} mt={0.35}>{dateMode === "month" ? monthRange.label : `${formatISTDate(fromDate)} to ${formatISTDate(toDate)}`}</Typography>
+                    </Box>
+                    <Button size="small" onClick={() => toggleExpanded(cardKey)} endIcon={<ExpandMoreIcon sx={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }} />} sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}>
+                      {isExpanded ? "Collapse" : "Expand"}
+                    </Button>
+                  </Stack>
+                </Box>
+
+                <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                  <Box sx={{ px: 1.5, pb: 1.5, pt: 0, borderTop: `1px solid ${border}` }}>
+                    <Stack spacing={1.2} mt={1.4}>
+                      <Typography fontSize={13} color={textSecondary}>{row.address || "Address not available"}</Typography>
+                      <Typography fontSize={13} color={textSecondary}>Total Billed: <Box component="span" fontWeight={700} color={textPrimary}>Rs.{toNum(row.total_billed).toFixed(0)}</Box></Typography>
+                      <Typography fontSize={13} color={textSecondary}>Received: <Box component="span" fontWeight={700} color="#16a34a">Rs.{toNum(row.received_amount).toFixed(0)}</Box></Typography>
+                      <Typography fontSize={13} color={textSecondary}>Outstanding: <Box component="span" fontWeight={800} color="#dc2626">Rs.{toNum(row.outstanding).toFixed(0)}</Box></Typography>
+                    </Stack>
+                  </Box>
+                </Collapse>
+              </Paper>
+            )
+          }) : renderPayments.map((payment) => {
             const status = paymentStatus(payment)
             const chip = statusChipProps(status)
             const isExpanded = !!expanded[payment.payment_id]
@@ -387,4 +444,6 @@ export default function Payments({ dark }) {
     </Box>
   )
 }
+
+
 
