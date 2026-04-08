@@ -192,11 +192,7 @@ export default function Orders({ dark }) {
       data = data.filter((o) => o.block_name === block)
     }
 
-    return data.sort((a, b) => {
-      const deliveryRank = Number(!!a.is_delivered) - Number(!!b.is_delivered)
-      if (deliveryRank !== 0) return deliveryRank
-      return String(a.customer_name || "").localeCompare(String(b.customer_name || ""))
-    })
+    return data
   }, [orders, effectiveRange, search, apartment, block])
 
   useEffect(() => {
