@@ -312,21 +312,21 @@ export default function Orders({ dark }) {
         margin: "auto",
         px: { xs: 1, sm: 2 },
         py: { xs: 1.5, sm: 2.5 },
-        background: "linear-gradient(180deg, #f8fbff 0%, #ffffff 220px)",
+        background: "linear-gradient(180deg, #fff8ef 0%, #eef6ff 140px, #f6fffb 280px, #ffffff 420px)",
       }}
     >
       {isAdmin ? (
         <Paper
           elevation={0}
-          sx={{
-            mb: 2,
-            p: 1.2,
-            borderRadius: 4,
-            border: "1px solid #dbe7f3",
-            background: "#fff",
-            boxShadow: "0 10px 28px rgba(15,23,42,0.04)",
-          }}
-        >
+        sx={{
+          mb: 2,
+          p: 1.2,
+          borderRadius: 4,
+          border: "1px solid #d7e7ff",
+          background: "linear-gradient(135deg, #f0f7ff 0%, #ffffff 55%, #eefcf6 100%)",
+          boxShadow: "0 12px 28px rgba(37,99,235,0.08)",
+        }}
+      >
           <Button
             fullWidth
             variant="contained"
@@ -354,9 +354,9 @@ export default function Orders({ dark }) {
           p: { xs: 1.25, sm: 1.5 },
           mb: 2,
           borderRadius: 4,
-          border: "1px solid #dde5ef",
-          background: "#fff",
-          boxShadow: "0 10px 28px rgba(15,23,42,0.04)",
+          border: "1px solid #dbe7f3",
+          background: "linear-gradient(135deg, #ffffff 0%, #f7fbff 60%, #fffaf0 100%)",
+          boxShadow: "0 12px 28px rgba(15,23,42,0.05)",
         }}
       >
         <Stack spacing={1.4}>
@@ -495,9 +495,9 @@ export default function Orders({ dark }) {
           mb: 2,
           p: { xs: 1.5, sm: 2 },
           borderRadius: 5,
-          border: "1px solid #dbe7f3",
-          background: "linear-gradient(135deg, #ffffff 0%, #eef6ff 100%)",
-          boxShadow: "0 16px 40px rgba(15,23,42,0.06)",
+          border: "1px solid #d7e7ff",
+          background: "linear-gradient(135deg, #fff8ef 0%, #ffffff 40%, #eef6ff 100%)",
+          boxShadow: "0 18px 38px rgba(59,130,246,0.12)",
         }}
       >
         <Stack spacing={1.2}>
@@ -530,7 +530,7 @@ export default function Orders({ dark }) {
         </Stack>
       </Paper>
 
-      <Paper elevation={0} sx={{ p: 1.1, mb: 2, borderRadius: 4, border: "1px solid #dde5ef", background: "#fff" }}>
+      <Paper elevation={0} sx={{ p: 1.1, mb: 2, borderRadius: 4, border: "1px solid #dce8f7", background: "linear-gradient(135deg, #ffffff 0%, #f5fbff 100%)" }}>
         <Stack direction="row" spacing={0.8} useFlexGap flexWrap="wrap">
           <Button size="small" variant="outlined" onClick={expandAllRows} sx={{ minWidth: "auto", textTransform: "none", borderRadius: 2.5, fontWeight: 700, px: 1.15, py: 0.45 }}>Expand</Button>
           <Button size="small" variant="outlined" onClick={collapseAllRows} sx={{ minWidth: "auto", textTransform: "none", borderRadius: 2.5, fontWeight: 700, px: 1.15, py: 0.45 }}>Collapse</Button>
@@ -540,7 +540,7 @@ export default function Orders({ dark }) {
       </Paper>
 
       {productSummary.length > 0 ? (
-        <Paper elevation={0} sx={{ p: 1.5, mb: 2, borderRadius: 4, border: "1px solid #dde5ef", background: "#fff" }}>
+        <Paper elevation={0} sx={{ p: 1.5, mb: 2, borderRadius: 4, border: "1px solid #dce8f7", background: "linear-gradient(135deg, #ffffff 0%, #f9fcff 60%, #fefbf3 100%)" }}>
           <Typography fontSize={11.5} fontWeight={800} letterSpacing="0.5px" color="#64748b" mb={1}>
             PRODUCT TOTALS - {effectiveRange.label.toUpperCase()}
           </Typography>
@@ -550,7 +550,7 @@ export default function Orders({ dark }) {
         </Paper>
       ) : null}
 
-      <Paper elevation={0} sx={{ p: 1, borderRadius: 4, border: "1px solid #dde5ef", background: "#f8fbff" }}>
+      <Paper elevation={0} sx={{ p: 1, borderRadius: 4, border: "1px solid #dbe7f3", background: "linear-gradient(180deg, #f9fcff 0%, #f6fbff 100%)" }}>
         {filtered.length === 0 ? (
           <Box py={7} textAlign="center">
             <CalendarTodayIcon sx={{ fontSize: 36, color: "#d1d5db", mb: 1, display: "block", mx: "auto" }} />
@@ -568,9 +568,9 @@ export default function Orders({ dark }) {
               sx={{
                 mb: index !== filtered.length - 1 ? 1 : 0,
                 borderRadius: 3,
-                border: "1px solid #dde5ef",
+                border: "1px solid #d7e5f5",
                 overflow: "hidden",
-                background: "#fff",
+                background: "linear-gradient(135deg, #ffffff 0%, #fbfdff 100%)",
               }}
             >
               <Box
