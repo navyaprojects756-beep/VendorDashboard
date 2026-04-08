@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+﻿import { useEffect, useMemo, useState } from "react"
 import API, { getToken } from "../../services/api"
 import { formatISTDate, formatISTDateTime, getISTDate, getISTDateStr } from "../../utils/istDate"
 import {
@@ -81,9 +81,9 @@ function PaymentTile({ label, value, tone, dark, formatter }) {
     orange: "#ea580c",
   }
   return (
-    <Paper elevation={0} sx={{ p: 2, borderRadius: 3, border: `1px solid ${border}`, background: backgrounds[tone], minWidth: 0 }}>
-      <Typography fontSize={12} color={dark ? "#94a3b8" : "#6b7280"}>{label}</Typography>
-      <Typography fontWeight={800} fontSize={{ xs: 24, sm: 28 }} sx={{ color: colors[tone], mt: 0.5, lineHeight: 1.1 }}>
+    <Paper elevation={0} sx={{ p: { xs: 1, sm: 1.8 }, borderRadius: 3, border: `1px solid ${border}`, background: backgrounds[tone], minWidth: 0 }}>
+      <Typography fontSize={{ xs: 9.5, sm: 11.5 }} color={dark ? "#94a3b8" : "#6b7280"} sx={{ lineHeight: 1.15 }}>{label}</Typography>
+      <Typography fontWeight={800} fontSize={{ xs: 12, sm: 26 }} sx={{ color: colors[tone], mt: 0.3, lineHeight: 1.05, wordBreak: "break-word" }}>
         {formatter ? formatter(value) : `Rs.${value.toFixed(0)}`}
       </Typography>
     </Paper>
@@ -243,7 +243,50 @@ export default function Payments({ dark }) {
 
   return (
     <Box sx={{ maxWidth: 1180, margin: "auto", px: { xs: 1, sm: 2 }, py: 3 }}>
-      <Box display="flex" alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" mb={2} gap={2} flexWrap="wrap">
+      <Paper elevation={0} sx={{ p: 1.25, mb: 2, borderRadius: 4, border: `1px solid ${border}`, background: "linear-gradient(135deg, #ffffff 0%, #f7fbff 60%, #fffaf0 100%)", boxShadow: "0 10px 28px rgba(15,23,42,0.04)" }}>
+        <Stack spacing={1.2}>
+          <Box display="flex" alignItems="center" gap={0.8}>
+            <CalendarTodayIcon sx={{ fontSize: 17, color: "#64748b" }} />
+            <Typography fontSize={13} fontWeight={800} color="#334155">Filters</Typography>
+          </Box>
+          <Stack direction={{ xs: "column", md: "row" }} spacing={1.2}>
+            <TextField size="small" placeholder="Search name, phone or address..." value={search} onChange={(e) => setSearch(e.target.value)} InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: textSecondary }} /></InputAdornment> }} sx={{ flex: 1, "& .MuiOutlinedInput-root": { borderRadius: 3, fontSize: 13, background: "#f8fafc" } }} />
+            <Select size="small" value={locationFilter} displayEmpty onChange={(e) => { setLocationFilter(e.target.value); setBlockFilter("") }} startAdornment={<InputAdornment position="start">{locationFilter === INDIVIDUAL_VALUE ? <HomeIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /> : <ApartmentIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} />}</InputAdornment>} sx={{ minWidth: { xs: "100%", md: 210 }, borderRadius: 3, fontSize: 13, background: "#f8fafc" }}>
+              <MenuItem value="">All Locations</MenuItem>
+              <MenuItem value={INDIVIDUAL_VALUE}>Individual Houses</MenuItem>
+              {apartments.map((name) => <MenuItem key={name} value={name}>{name}</MenuItem>)}
+            </Select>
+            <Select size="small" value={blockFilter} displayEmpty disabled={!locationFilter || locationFilter === INDIVIDUAL_VALUE} onChange={(e) => setBlockFilter(e.target.value)} startAdornment={<InputAdornment position="start"><GridViewIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /></InputAdornment>} sx={{ minWidth: { xs: "100%", md: 180 }, borderRadius: 3, fontSize: 13, background: "#f8fafc" }}>
+              <MenuItem value="">All Blocks</MenuItem>
+              {blocks.map((name) => <MenuItem key={name} value={name}>{name}</MenuItem>)}
+            </Select>
+          </Stack>
+          <Stack direction={{ xs: "column", md: "row" }} spacing={1.2} alignItems={{ xs: "stretch", md: "center" }}>
+            <ToggleButtonGroup size="small" exclusive value={dateMode} onChange={(_, value) => value && setDateMode(value)} sx={{ display: "flex", flexWrap: "nowrap", gap: 0.65, overflowX: "auto", pb: 0.25, "& .MuiToggleButton-root": { borderRadius: 2.5, border: "1px solid #d7e0ea !important", textTransform: "none", px: 1.2, py: 0.7, fontSize: 12, fontWeight: 700, color: "#475569", background: "#fff", whiteSpace: "nowrap", flexShrink: 0 }, "& .Mui-selected": { background: "#1d4ed8 !important", color: "#fff !important", boxShadow: "0 8px 18px rgba(29,78,216,0.22)" } }}>
+              <ToggleButton value="today">Today</ToggleButton>
+              <ToggleButton value="month">This Month</ToggleButton>
+              <ToggleButton value="custom">Custom</ToggleButton>
+            </ToggleButtonGroup>
+            <Select size="small" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} sx={{ minWidth: { xs: "100%", md: 190 }, borderRadius: 3, fontSize: 13, background: "#f8fafc" }}>
+              <MenuItem value="all">All Payments</MenuItem>
+              <MenuItem value="pending">Pending To Accept</MenuItem>
+              <MenuItem value="accepted">Accepted</MenuItem>
+              <MenuItem value="rejected">Rejected</MenuItem>
+              <MenuItem value="need_to_pay">Need To Pay</MenuItem>
+            </Select>
+            {dateMode === "custom" ? (
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2}>
+                <TextField size="small" type="date" label="From" value={fromDate} onChange={(e) => setFromDate(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ width: 160, "& .MuiOutlinedInput-root": { borderRadius: 3 } }} />
+                <TextField size="small" type="date" label="To" value={toDate} onChange={(e) => setToDate(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ width: 160, "& .MuiOutlinedInput-root": { borderRadius: 3 } }} />
+              </Stack>
+            ) : (
+              <Chip icon={<CalendarTodayIcon />} label={dateMode === "month" ? monthRange.label : formatISTDate(fromDate)} sx={{ borderRadius: 2.5, fontWeight: 700, alignSelf: { xs: "flex-start", md: "center" }, background: "#eef4ff", color: "#1d4ed8", border: "1px solid #bfdbfe" }} />
+            )}
+          </Stack>
+        </Stack>
+      </Paper>
+
+      <Box display="flex" alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" mb={1.5} gap={1.25} flexWrap="wrap">
         <Box display="flex" alignItems="center" gap={1.2}>
           <Box sx={{ width: 38, height: 38, borderRadius: "12px", background: "linear-gradient(135deg,#0f766e,#14b8a6)", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <PaymentsIcon sx={{ fontSize: 18, color: "white" }} />
@@ -253,81 +296,19 @@ export default function Payments({ dark }) {
             <Typography fontSize={12.5} color={textSecondary}>Track payment history, approvals, rejected proofs, and outstanding balances.</Typography>
           </Box>
         </Box>
-        <Stack direction="row" spacing={1} flexWrap="wrap">
-          <Button size="small" variant="outlined" startIcon={<RefreshIcon />} onClick={() => loadPayments(true)} disabled={refreshing} sx={{ borderRadius: 2, textTransform: "none" }}>Refresh</Button>
-          <Button size="small" variant="outlined" onClick={expandAll} sx={{ borderRadius: 2, textTransform: "none" }}>Expand All</Button>
-          <Button size="small" variant="outlined" onClick={collapseAll} sx={{ borderRadius: 2, textTransform: "none" }}>Collapse All</Button>
+        <Stack direction="row" spacing={0.8} flexWrap="wrap">
+          <Button size="small" variant="outlined" startIcon={<RefreshIcon />} onClick={() => loadPayments(true)} disabled={refreshing} sx={{ borderRadius: 2, textTransform: "none", px: 1.2, py: 0.45 }}>Refresh</Button>
+          <Button size="small" variant="outlined" onClick={expandAll} sx={{ borderRadius: 2, textTransform: "none", px: 1.2, py: 0.45 }}>Expand</Button>
+          <Button size="small" variant="outlined" onClick={collapseAll} sx={{ borderRadius: 2, textTransform: "none", px: 1.2, py: 0.45 }}>Collapse</Button>
         </Stack>
       </Box>
 
-      <Box display="grid" gridTemplateColumns={{ xs: "1fr", md: "repeat(4, 1fr)" }} gap={1.5} mb={2}>
+      <Box display="grid" gridTemplateColumns="repeat(4, minmax(0, 1fr))" gap={0.8} mb={1.6}>
         <PaymentTile label="Total Amount" value={totals.totalBilled} tone="blue" dark={dark} />
         <PaymentTile label="Received Amount" value={totals.received} tone="green" dark={dark} />
         <PaymentTile label="Outstanding Amount" value={totals.outstanding} tone="orange" dark={dark} />
         <PaymentTile label="Customers Need To Pay" value={customersNeedToPay} tone="orange" dark={dark} formatter={(value) => `${value}`} />
       </Box>
-
-      <Paper elevation={0} sx={{ p: 1.5, mb: 2, borderRadius: 3, border: `1px solid ${border}`, background: bg }}>
-        <Stack spacing={1.2}>
-          <Stack direction={{ xs: "column", md: "row" }} spacing={1.2}>
-            <TextField
-              size="small"
-              placeholder="Search name, phone or address..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: textSecondary }} /></InputAdornment> }}
-              sx={{ flex: 1, "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }}
-            />
-            <Select
-              size="small"
-              value={locationFilter}
-              displayEmpty
-              onChange={(e) => { setLocationFilter(e.target.value); setBlockFilter("") }}
-              startAdornment={<InputAdornment position="start">{locationFilter === INDIVIDUAL_VALUE ? <HomeIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /> : <ApartmentIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} />}</InputAdornment>}
-              sx={{ minWidth: { xs: "100%", md: 210 }, borderRadius: 2, fontSize: 13 }}
-            >
-              <MenuItem value="">All Locations</MenuItem>
-              <MenuItem value={INDIVIDUAL_VALUE}>Individual Houses</MenuItem>
-              {apartments.map((name) => <MenuItem key={name} value={name}>{name}</MenuItem>)}
-            </Select>
-            <Select
-              size="small"
-              value={blockFilter}
-              displayEmpty
-              disabled={!locationFilter || locationFilter === INDIVIDUAL_VALUE}
-              onChange={(e) => setBlockFilter(e.target.value)}
-              startAdornment={<InputAdornment position="start"><GridViewIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /></InputAdornment>}
-              sx={{ minWidth: { xs: "100%", md: 180 }, borderRadius: 2, fontSize: 13 }}
-            >
-              <MenuItem value="">All Blocks</MenuItem>
-              {blocks.map((name) => <MenuItem key={name} value={name}>{name}</MenuItem>)}
-            </Select>
-          </Stack>
-
-          <Stack direction={{ xs: "column", md: "row" }} spacing={1.2} alignItems={{ xs: "stretch", md: "center" }}>
-            <ToggleButtonGroup size="small" exclusive value={dateMode} onChange={(_, value) => value && setDateMode(value)} sx={{ flexWrap: "wrap" }}>
-              <ToggleButton value="today">Today</ToggleButton>
-              <ToggleButton value="month">This Month</ToggleButton>
-              <ToggleButton value="custom">Custom</ToggleButton>
-            </ToggleButtonGroup>
-            <Select size="small" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} sx={{ minWidth: { xs: "100%", md: 190 }, borderRadius: 2, fontSize: 13 }}>
-              <MenuItem value="all">All Payments</MenuItem>
-              <MenuItem value="pending">Pending To Accept</MenuItem>
-              <MenuItem value="accepted">Accepted</MenuItem>
-              <MenuItem value="rejected">Rejected</MenuItem>
-              <MenuItem value="need_to_pay">Need To Pay</MenuItem>
-            </Select>
-            {dateMode === "custom" ? (
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2}>
-                <TextField size="small" type="date" label="From" value={fromDate} onChange={(e) => setFromDate(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ width: 160 }} />
-                <TextField size="small" type="date" label="To" value={toDate} onChange={(e) => setToDate(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ width: 160 }} />
-              </Stack>
-            ) : (
-              <Chip icon={<CalendarTodayIcon />} label={dateMode === "month" ? monthRange.label : formatISTDate(fromDate)} sx={{ borderRadius: 2, fontWeight: 600, alignSelf: { xs: "flex-start", md: "center" } }} />
-            )}
-          </Stack>
-        </Stack>
-      </Paper>
 
       {loading ? (
         <Box py={10} textAlign="center"><CircularProgress size={26} /></Box>
@@ -381,47 +362,52 @@ export default function Payments({ dark }) {
             return (
               <Paper key={payment.payment_id} elevation={0} sx={{ borderRadius: 3, border: `1px solid ${border}`, background: bg, overflow: "hidden" }}>
                 <Box sx={{ px: 1.5, py: 1.4 }}>
-                  <Stack direction={{ xs: "column", md: "row" }} spacing={1.2} justifyContent="space-between" alignItems={{ xs: "flex-start", md: "center" }}>
+                  <Stack direction="row" spacing={1.2} justifyContent="space-between" alignItems="flex-start">
                     <Box minWidth={0} flex={1}>
-                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" mb={0.8}>
-                        <Typography fontWeight={800} color={textPrimary} fontSize={18}>Rs.{toNum(payment.amount).toFixed(0)}</Typography>
-                        <Chip size="small" label={chip.label} color={chip.color} />
-                        <Chip size="small" variant="outlined" label={payment.payment_method || "other"} />
-                      </Stack>
                       <Typography fontWeight={700} color={textPrimary} fontSize={14}><PersonIcon sx={{ fontSize: 15, verticalAlign: "-2px", mr: 0.4 }} />{payment.customer_name || "Customer"}</Typography>
                       <Typography fontSize={12.5} color={textSecondary}><PhoneIcon sx={{ fontSize: 14, verticalAlign: "-2px", mr: 0.4 }} />{payment.customer_phone}</Typography>
                       <Typography fontSize={12} color={textSecondary} mt={0.35}>{formatISTDate(payment.payment_date)} - {formatISTDateTime(payment.created_at, { hour: "2-digit", minute: "2-digit" })}</Typography>
                     </Box>
-                    <Button size="small" onClick={() => toggleExpanded(payment.payment_id)} endIcon={<ExpandMoreIcon sx={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }} />} sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}>
-                      {isExpanded ? "Collapse" : "Expand"}
-                    </Button>
+                    <Stack alignItems="flex-end" spacing={0.8} flexShrink={0}>
+                      <Stack direction="row" spacing={0.8} alignItems="center" useFlexGap flexWrap="wrap" justifyContent="flex-end">
+                        <Typography fontWeight={800} color={textPrimary} fontSize={18}>Rs.{toNum(payment.amount).toFixed(0)}</Typography>
+                        <Chip size="small" label={chip.label} color={chip.color} />
+                      </Stack>
+                      <Button size="small" onClick={() => toggleExpanded(payment.payment_id)} endIcon={<ExpandMoreIcon sx={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }} />} sx={{ minWidth: "auto", textTransform: "none", fontWeight: 700, borderRadius: 2, px: 0.4 }}>
+                        {isExpanded ? "Collapse" : "Details"}
+                      </Button>
+                    </Stack>
                   </Stack>
                 </Box>
 
                 <Collapse in={isExpanded} timeout="auto" unmountOnExit>
                   <Box sx={{ px: 1.5, pb: 1.5, pt: 0, borderTop: `1px solid ${border}` }}>
-                    <Stack spacing={1.2} mt={1.4}>
-                      <Typography fontSize={13} color={textSecondary}>{payment.address || "Address not available"}</Typography>
-                      {payment.period_from && payment.period_to && (
-                        <Typography fontSize={13} color={textSecondary}>Covers: <Box component="span" fontWeight={700} color={textPrimary}>{formatISTDate(payment.period_from)} to {formatISTDate(payment.period_to)}</Box></Typography>
-                      )}
-                      {!!payment.notes && (
-                        <Typography fontSize={13} color={textSecondary}>Note: <Box component="span" color={textPrimary}>{payment.notes}</Box></Typography>
-                      )}
-                      <Stack direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }}>
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={1.4} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "flex-start" }} mt={1.4}>
+                      <Stack spacing={1} sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography fontSize={13} color={textSecondary} sx={{ textAlign: "left" }}>{payment.address || "Address not available"}</Typography>
+                        {payment.period_from && payment.period_to && (
+                          <Typography fontSize={13} color={textSecondary} sx={{ textAlign: "left" }}>
+                            Covers: <Box component="span" fontWeight={700} color={textPrimary}>{formatISTDate(payment.period_from)} to {formatISTDate(payment.period_to)}</Box>
+                          </Typography>
+                        )}
+                        {!!payment.notes && (
+                          <Typography fontSize={13} color={textSecondary} sx={{ textAlign: "left" }}>
+                            Note: <Box component="span" color={textPrimary}>{payment.notes}</Box>
+                          </Typography>
+                        )}
                         {payment.screenshot_url ? (
                           <Button size="small" variant="outlined" startIcon={<AttachFileIcon />} onClick={() => setPreviewImage(payment.screenshot_url)} sx={{ borderRadius: 2, textTransform: "none", alignSelf: "flex-start" }}>Open Attachment</Button>
                         ) : (
                           <Chip size="small" variant="outlined" label="No attachment" sx={{ alignSelf: "flex-start" }} />
                         )}
-                        <Stack direction="row" spacing={1} flexWrap="wrap">
+                      </Stack>
+                      <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent={{ xs: "flex-start", sm: "flex-end" }} sx={{ minWidth: { sm: 170 } }}>
                           {(!payment.is_verified || payment.is_revoked) && (
                             <Button size="small" variant="contained" startIcon={<CheckCircleIcon />} disabled={busyVerify || busyRevoke} onClick={() => handleAction(payment.payment_id, "verify")} sx={{ borderRadius: 2, textTransform: "none", background: "#16a34a" }}>Accept</Button>
                           )}
                           {!payment.is_revoked && (
                             <Button size="small" variant="outlined" color="error" startIcon={<BlockIcon />} disabled={busyVerify || busyRevoke} onClick={() => handleAction(payment.payment_id, "revoke")} sx={{ borderRadius: 2, textTransform: "none" }}>Reject</Button>
                           )}
-                        </Stack>
                       </Stack>
                     </Stack>
                   </Box>
@@ -444,6 +430,8 @@ export default function Payments({ dark }) {
     </Box>
   )
 }
+
+
 
 
 

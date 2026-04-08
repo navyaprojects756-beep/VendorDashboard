@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+﻿import { useEffect, useMemo, useState } from "react"
 import API, { getToken } from "../../services/api"
 import Toast from "../../components/Toast"
 import { formatISTDate, getISTDate, toISTDateStr } from "../../utils/istDate"
@@ -25,8 +25,9 @@ import DeleteOutlineIcon        from "@mui/icons-material/DeleteOutline"
 import AttachFileIcon           from "@mui/icons-material/AttachFile"
 import CheckIcon                from "@mui/icons-material/Check"
 import BlockIcon                from "@mui/icons-material/Block"
+import CalendarTodayIcon        from "@mui/icons-material/CalendarToday"
 
-/* ── date helpers ── */
+/* â”€â”€ date helpers â”€â”€ */
 const toDateStr = (d) => {
   const y  = d.getFullYear()
   const m  = String(d.getMonth() + 1).padStart(2, "0")
@@ -67,9 +68,9 @@ const getOrderTotal = (order, rate) => {
   return itemTotal + getOrderDelivery(order)
 }
 
-/* ═══════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    MAIN
-═══════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 export default function Customers({ dark }) {
   const [customers,  setCustomers]  = useState([])
   const [filtered,   setFiltered]   = useState([])
@@ -80,9 +81,17 @@ export default function Customers({ dark }) {
   const [blockFilter, setBlockFilter] = useState("")
   const [apartments, setApartments] = useState([])
 
-  /* bill period: "this" | "last" */
-  const [period, setPeriod] = useState("this")
-  const range = period === "this" ? getThisMonth() : getLastMonth()
+  /* bill period: "all" | "this" | "last" */
+  const initialMonth = getThisMonth()
+  const [period, setPeriod] = useState("all")
+  const [fromDate, setFromDate] = useState(initialMonth.from)
+  const [toDate, setToDate] = useState(initialMonth.to)
+  const range = useMemo(() => {
+    if (period === "all") return { from: "", to: "", label: "All" }
+    if (period === "last") return getLastMonth()
+    if (period === "custom") return { from: fromDate, to: toDate, label: "Custom" }
+    return getThisMonth()
+  }, [period, fromDate, toDate])
 
   /* individual invoice dialog */
   const [dialogOpen,  setDialogOpen]  = useState(false)
@@ -113,7 +122,7 @@ export default function Customers({ dark }) {
   const textPrimary   = dark ? "#f1f5f9" : "#111827"
   const textSecondary = dark ? "#94a3b8" : "#6b7280"
 
-  /* ── load customers ── */
+  /* â”€â”€ load customers â”€â”€ */
   useEffect(() => {
     API.get(`/customers?token=${getToken()}`)
       .then((r) => {
@@ -123,7 +132,7 @@ export default function Customers({ dark }) {
       .finally(() => setLoading(false))
   }, [])
 
-  /* ── filter ── */
+  /* â”€â”€ filter â”€â”€ */
   useEffect(() => {
     let data = [...customers]
     if (search) {
@@ -144,7 +153,7 @@ export default function Customers({ dark }) {
     ? [...new Set(customers.filter((c) => c.apartment_name === aptFilter).map((c) => c.block_name).filter(Boolean))]
     : []
 
-  /* ── invoice dialog ── */
+  /* â”€â”€ invoice dialog â”€â”€ */
   const fetchInvoice = async (customerId) => {
     setInvLoading(true); setInvoiceData(null)
     try {
@@ -158,7 +167,7 @@ export default function Customers({ dark }) {
     fetchInvoice(customer.customer_id)
   }
 
-  /* ── PDF download ── */
+  /* â”€â”€ PDF download â”€â”€ */
   const downloadPDF = async (customerId, phone) => {
     const url = `${import.meta.env.VITE_API_BASE_URL}/customers/${customerId}/invoice/pdf?token=${getToken()}&from=${range.from}&to=${range.to}`
     const res = await fetch(url)
@@ -184,7 +193,7 @@ export default function Customers({ dark }) {
     catch (err) { setToast({ open: true, message: err.message, type: "error" }) }
   }
 
-  /* ── payment helpers ── */
+  /* â”€â”€ payment helpers â”€â”€ */
   const fetchPayments = async (customerId) => {
     setPayLoading(true); setPayData(null)
     try {
@@ -258,19 +267,96 @@ export default function Customers({ dark }) {
   const revokePayment = async (paymentId) => {
     try {
       await API.patch(`/payments/${paymentId}/revoke?token=${getToken()}`)
-      setToast({ open: true, message: "Payment revoked — orders reset to unpaid.", type: "success" })
+      setToast({ open: true, message: "Payment revoked - orders reset to unpaid.", type: "success" })
       fetchPayments(payCustomer.customer_id)
     } catch {
       setToast({ open: true, message: "Failed to revoke payment", type: "error" })
     }
   }
 
-  /* ── stats ── */
+  /* â”€â”€ stats â”€â”€ */
   const activeCount = customers.filter((c) => c.subscription_status === "active").length
 
-  /* ─────────────────────── RENDER ─────────────────────── */
+  /* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ RENDER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   return (
     <Box sx={{ maxWidth: 780, margin: "auto", px: { xs: 1, sm: 2 }, py: 3 }}>
+
+      <Paper elevation={0} sx={{ px: 1.5, py: 1.2, mb: 2, borderRadius: 4, border: `1px solid ${border}`, background: "linear-gradient(135deg, #ffffff 0%, #f7fbff 60%, #fffaf0 100%)", boxShadow: "0 10px 28px rgba(15,23,42,0.04)" }}>
+        <Box display="flex" alignItems="center" gap={0.8} mb={1.1}>
+          <CalendarTodayIcon sx={{ fontSize: 17, color: "#64748b" }} />
+          <Typography fontSize={13} fontWeight={800} color="#334155">Filters</Typography>
+        </Box>
+        <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+          <TextField size="small" placeholder="Search name, phone or address..." value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: textSecondary }} /></InputAdornment> }}
+            sx={{ flex: "1 1 170px", "& .MuiOutlinedInput-root": { borderRadius: 3, fontSize: 13, background: "#f8fafc" } }} />
+          <Select size="small" value={aptFilter} displayEmpty
+            onChange={(e) => { setAptFilter(e.target.value); setBlockFilter("") }}
+            startAdornment={<InputAdornment position="start">{aptFilter === INDIVIDUAL_VALUE ? <HomeIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /> : <ApartmentIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} />}</InputAdornment>}
+            sx={{ flex: "1 1 150px", borderRadius: 3, fontSize: 13, background: "#f8fafc" }}>
+            <MenuItem value="">All Locations</MenuItem>
+            <MenuItem value={INDIVIDUAL_VALUE}>Individual Houses</MenuItem>
+            {apartments.map((a) => <MenuItem key={a} value={a} sx={{ fontSize: 13 }}>{a}</MenuItem>)}
+          </Select>
+          <Select size="small" value={blockFilter} displayEmpty
+            disabled={!aptFilter || aptFilter === INDIVIDUAL_VALUE}
+            onChange={(e) => setBlockFilter(e.target.value)}
+            startAdornment={<InputAdornment position="start"><GridViewIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /></InputAdornment>}
+            sx={{ flex: "1 1 130px", borderRadius: 3, fontSize: 13, background: "#f8fafc" }}>
+            <MenuItem value="">All Blocks</MenuItem>
+            {blocks.map((b) => <MenuItem key={b} value={b} sx={{ fontSize: 13 }}>{b}</MenuItem>)}
+          </Select>
+        </Box>
+        <Box mt={1.1} sx={{ border: "1px solid #e2e8f0", borderRadius: 3, px: 1, py: 1, background: "#fffdf8" }}>
+          <Typography fontSize={11.5} fontWeight={700} color="#64748b" px={0.2} mb={0.7}>
+            Filter for bill
+          </Typography>
+          <Box display="flex" gap={0.8} flexWrap="wrap">
+              {[{ key: "all", label: "All" }, { key: "this", label: "This Month" }, { key: "last", label: "Last Month" }, { key: "custom", label: "Custom" }].map((p) => (
+                <Box key={p.key}
+                  onClick={() => setPeriod(p.key)}
+                  sx={{
+                    px: 1.4, py: 0.7, borderRadius: 2.5, cursor: "pointer", fontSize: 12, fontWeight: 700,
+                    border: `1px solid ${period === p.key ? "#1d4ed8" : "#d7e0ea"}`,
+                    background: period === p.key ? "#1d4ed8" : "#fff",
+                    color: period === p.key ? "#fff" : "#475569",
+                    transition: "all 0.15s",
+                    whiteSpace: "nowrap",
+                    userSelect: "none",
+                  }}>
+                  {p.label}
+                </Box>
+              ))}
+          </Box>
+        </Box>
+        {period === "custom" ? (
+          <Box display="flex" gap={1} flexWrap="wrap" mt={1}>
+            <TextField
+              type="date"
+              size="small"
+              label="From"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ flex: "1 1 170px", "& .MuiOutlinedInput-root": { borderRadius: 3, background: "#f8fafc" } }}
+            />
+            <TextField
+              type="date"
+              size="small"
+              label="To"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              inputProps={{ min: fromDate }}
+              InputLabelProps={{ shrink: true }}
+              sx={{ flex: "1 1 170px", "& .MuiOutlinedInput-root": { borderRadius: 3, background: "#f8fafc" } }}
+            />
+          </Box>
+        ) : null}
+        <Typography fontSize={11.5} color={textSecondary} mt={1} px={0.5}>
+          Bill period: <Box component="span" fontWeight={700} color={textPrimary}>{period === "all" ? "All" : `${range.label} | ${fmtDate(range.from)} to ${fmtDate(range.to)}`}</Box>
+        </Typography>
+      </Paper>
 
       {/* Page header */}
       <Box display="flex" alignItems="center" gap={1.2} mb={3}>
@@ -296,59 +382,6 @@ export default function Customers({ dark }) {
           </Paper>
         ))}
       </Box>
-
-      {/* ── Filters + period ── */}
-      <Paper elevation={0} sx={{ px: 1.5, py: 1.2, mb: 2, borderRadius: 3, border: `1px solid ${border}`, background: bg }}>
-        <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
-
-          <TextField size="small" placeholder="Search name, phone or address..." value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: textSecondary }} /></InputAdornment> }}
-            sx={{ flex: "1 1 170px", "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }} />
-
-          {/* Apartment filter */}
-          <Select size="small" value={aptFilter} displayEmpty
-            onChange={(e) => { setAptFilter(e.target.value); setBlockFilter("") }}
-            startAdornment={<InputAdornment position="start">{aptFilter === INDIVIDUAL_VALUE ? <HomeIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /> : <ApartmentIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} />}</InputAdornment>}
-            sx={{ flex: "1 1 150px", borderRadius: 2, fontSize: 13 }}>
-            <MenuItem value="">All Locations</MenuItem>
-            <MenuItem value={INDIVIDUAL_VALUE}>Individual Houses</MenuItem>
-            {apartments.map((a) => <MenuItem key={a} value={a} sx={{ fontSize: 13 }}>{a}</MenuItem>)}
-          </Select>
-
-          <Select size="small" value={blockFilter} displayEmpty
-            disabled={!aptFilter || aptFilter === INDIVIDUAL_VALUE}
-            onChange={(e) => setBlockFilter(e.target.value)}
-            startAdornment={<InputAdornment position="start"><GridViewIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /></InputAdornment>}
-            sx={{ flex: "1 1 130px", borderRadius: 2, fontSize: 13 }}>
-            <MenuItem value="">All Blocks</MenuItem>
-            {blocks.map((b) => <MenuItem key={b} value={b} sx={{ fontSize: 13 }}>{b}</MenuItem>)}
-          </Select>
-
-          {/* Month pills */}
-          <Box display="flex" gap={0.8} flexShrink={0}>
-            {[{ key: "this", label: "This Month" }, { key: "last", label: "Last Month" }].map((p) => (
-              <Box key={p.key}
-                onClick={() => setPeriod(p.key)}
-                sx={{
-                  px: 1.5, py: 0.5, borderRadius: "20px", cursor: "pointer", fontSize: 12, fontWeight: 600,
-                  border: `1px solid ${period === p.key ? "#2563eb" : border}`,
-                  background: period === p.key ? "#2563eb" : "transparent",
-                  color: period === p.key ? "#fff" : textSecondary,
-                  transition: "all 0.15s",
-                  userSelect: "none",
-                }}>
-                {p.label}
-              </Box>
-            ))}
-          </Box>
-        </Box>
-
-        {/* Period label */}
-        <Typography fontSize={11.5} color={textSecondary} mt={1} px={0.5}>
-          Bill period: <Box component="span" fontWeight={700} color={textPrimary}>{range.label} &nbsp;·&nbsp; {fmtDate(range.from)} → {fmtDate(range.to)}</Box>
-        </Typography>
-      </Paper>
       <Typography fontSize={13} color={textSecondary} mb={1} px={0.5}>
         {filtered.length} customer{filtered.length !== 1 ? "s" : ""}{aptFilter ? ` - ${aptFilter === INDIVIDUAL_VALUE ? "Individual Houses" : aptFilter}` : ""}{blockFilter ? ` - ${blockFilter}` : ""}
       </Typography>
@@ -398,13 +431,8 @@ export default function Customers({ dark }) {
                   )}
                 </Box>
 
-                {/* RIGHT — icon buttons only */}
+                {/* RIGHT â€” icon buttons only */}
                 <Box display="flex" alignItems="center" gap={0.6} flexShrink={0}>
-                  {c.subscription_quantity && (
-                    <Chip label={`×${c.subscription_quantity}`} size="small"
-                      sx={{ fontWeight: 700, fontSize: 11, height: 20, background: dark ? "#1e3a5f" : "#eff6ff", color: "#2563eb", mr: 0.5 }} />
-                  )}
-
                   {/* Download PDF */}
                   <Tooltip title="Download bill PDF" arrow>
                     <span>
@@ -443,13 +471,13 @@ export default function Customers({ dark }) {
         })}
       </Paper>
 
-      {/* ═══ BILL DETAILS DIALOG ═══ */}
+      {/* â•â•â• BILL DETAILS DIALOG â•â•â• */}
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth
         PaperProps={{ sx: { borderRadius: 3, background: bg } }}>
 
         <DialogTitle sx={{ pb: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <Box>
-            <Typography fontWeight={700} fontSize={15} color={textPrimary}>Bill — {selCustomer?.phone}</Typography>
+            <Typography fontWeight={700} fontSize={15} color={textPrimary}>Bill - {selCustomer?.phone}</Typography>
             {selCustomer?.address && <Typography fontSize={11.5} color={textSecondary}>{selCustomer.address}</Typography>}
           </Box>
           <IconButton size="small" onClick={() => setDialogOpen(false)}><CloseIcon fontSize="small" /></IconButton>
@@ -458,7 +486,7 @@ export default function Customers({ dark }) {
         <DialogContent dividers sx={{ borderColor: border }}>
           <Box display="flex" alignItems="center" gap={1} flexWrap="wrap" mb={2}>
             <Box sx={{ px: 1.5, py: 0.4, borderRadius: 2, background: bgCard, border: `1px solid ${border}` }}>
-              <Typography fontSize={12} fontWeight={700} color={textPrimary}>{range.label} &nbsp;·&nbsp; {fmtDate(range.from)} → {fmtDate(range.to)}</Typography>
+              <Typography fontSize={12} fontWeight={700} color={textPrimary}>{range.label} | {fmtDate(range.from)} to {fmtDate(range.to)}</Typography>
             </Box>
             <IconButton size="small" onClick={() => fetchInvoice(selCustomer?.customer_id)}
               sx={{ border: `1px solid ${border}`, borderRadius: "7px", p: 0.5, color: textSecondary }}>
@@ -485,14 +513,14 @@ export default function Customers({ dark }) {
 
             return (
               <>
-                {/* ── Summary chips ── */}
+                {/* â”€â”€ Summary chips â”€â”€ */}
                 <Box display="flex" gap={1} flexWrap="wrap" mb={2}>
                   {[
                     { label: `${delivered.length} deliveries`, color: "#2563eb", bg: dark ? "#1e3a5f" : "#eff6ff" },
-                    { label: `₹${totalAmt.toFixed(2)} total`,  color: "#16a34a", bg: dark ? "#14532d" : "#f0fdf4" },
+                    { label: `Rs.${totalAmt.toFixed(2)} total`,  color: "#16a34a", bg: dark ? "#14532d" : "#f0fdf4" },
                     unpaidAmt > 0
-                      ? { label: `₹${unpaidAmt.toFixed(2)} due`, color: "#dc2626", bg: dark ? "#450a0a" : "#fee2e2" }
-                      : { label: "Fully Paid ✓",                 color: "#16a34a", bg: dark ? "#14532d" : "#f0fdf4" },
+                      ? { label: `Rs.${unpaidAmt.toFixed(2)} due`, color: "#dc2626", bg: dark ? "#450a0a" : "#fee2e2" }
+                      : { label: "Fully Paid", color: "#16a34a", bg: dark ? "#14532d" : "#f0fdf4" },
                   ].map((s) => (
                     <Box key={s.label} sx={{ px: 1.5, py: 0.5, borderRadius: 2, background: s.bg }}>
                       <Typography fontSize={12} fontWeight={700} color={s.color}>{s.label}</Typography>
@@ -555,9 +583,9 @@ export default function Customers({ dark }) {
                                         color: isAdhoc ? "#78350f" : "#0369a1" }} />
                                   </TableCell>
                                   <TableCell sx={cell({ textAlign: "center", fontWeight: 600 })}>{it.quantity}</TableCell>
-                                  <TableCell sx={cell({ textAlign: "right", color: textSecondary })}>₹{parseFloat(it.price_at_order).toFixed(2)}</TableCell>
-                                  <TableCell sx={cell({ textAlign: "right", color: textSecondary })}>{dc > 0 ? `₹${dc.toFixed(2)}` : "—"}</TableCell>
-                                  <TableCell sx={cell({ textAlign: "right", fontWeight: 700, color: "#2563eb" })}>₹{amt.toFixed(2)}</TableCell>
+                                  <TableCell sx={cell({ textAlign: "right", color: textSecondary })}>Rs.{parseFloat(it.price_at_order).toFixed(2)}</TableCell>
+                                  <TableCell sx={cell({ textAlign: "right", color: textSecondary })}>{dc > 0 ? `Rs.${dc.toFixed(2)}` : "-"}</TableCell>
+                                  <TableCell sx={cell({ textAlign: "right", fontWeight: 700, color: "#2563eb" })}>Rs.{amt.toFixed(2)}</TableCell>
                                   <TableCell sx={cell()}>
                                     {ii === 0 && (
                                       <Chip label={isPaid ? "Paid" : "Unpaid"} size="small"
@@ -577,8 +605,8 @@ export default function Customers({ dark }) {
                             <TableRow key={oi} sx={{ background: rowBg, "&:hover": { background: bgCard } }}>
                               <TableCell sx={cell({ fontWeight: 600 })}>{dateStr}</TableCell>
                               <TableCell sx={cell({ textAlign: "center" })}>{o.quantity}</TableCell>
-                              <TableCell sx={cell({ textAlign: "right", color: textSecondary })}>₹{rate.toFixed(2)}</TableCell>
-                              <TableCell sx={cell({ textAlign: "right", fontWeight: 700, color: "#2563eb" })}>₹{amt.toFixed(2)}</TableCell>
+                              <TableCell sx={cell({ textAlign: "right", color: textSecondary })}>Rs.{rate.toFixed(2)}</TableCell>
+                              <TableCell sx={cell({ textAlign: "right", fontWeight: 700, color: "#2563eb" })}>Rs.{amt.toFixed(2)}</TableCell>
                               <TableCell sx={cell()}>
                                 <Chip label={isPaid ? "Paid" : "Unpaid"} size="small"
                                   sx={{ fontSize: 10, fontWeight: 700, height: 18,
@@ -596,7 +624,7 @@ export default function Customers({ dark }) {
                             Total
                           </TableCell>
                           <TableCell sx={{ fontWeight: 800, fontSize: 14, color: "#16a34a", borderColor: border, textAlign: "right", py: 1, px: 1 }}>
-                            ₹{totalAmt.toFixed(2)}
+                            Rs.{totalAmt.toFixed(2)}
                           </TableCell>
                           <TableCell sx={{ borderColor: border }} />
                         </TableRow>
@@ -609,7 +637,7 @@ export default function Customers({ dark }) {
                               Outstanding (Unpaid)
                             </TableCell>
                             <TableCell sx={{ fontWeight: 800, fontSize: 13, color: "#dc2626", borderColor: border, textAlign: "right", py: 0.8, px: 1 }}>
-                              ₹{unpaidAmt.toFixed(2)}
+                              Rs.{unpaidAmt.toFixed(2)}
                             </TableCell>
                             <TableCell sx={{ borderColor: border }} />
                           </TableRow>
@@ -634,13 +662,13 @@ export default function Customers({ dark }) {
         </DialogActions>
       </Dialog>
 
-      {/* ═══ PAYMENTS DIALOG ═══ */}
+      {/* â•â•â• PAYMENTS DIALOG â•â•â• */}
       <Dialog open={payDialogOpen} onClose={() => setPayDialogOpen(false)} maxWidth="sm" fullWidth
         PaperProps={{ sx: { borderRadius: 3, background: bg } }}>
 
         <DialogTitle sx={{ pb: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <Box>
-            <Typography fontWeight={700} fontSize={15} color={textPrimary}>Payments — {payCustomer?.phone}</Typography>
+            <Typography fontWeight={700} fontSize={15} color={textPrimary}>Payments - {payCustomer?.phone}</Typography>
             {payCustomer?.address && <Typography fontSize={11.5} color={textSecondary}>{payCustomer.address}</Typography>}
           </Box>
           <IconButton size="small" onClick={() => setPayDialogOpen(false)}><CloseIcon fontSize="small" /></IconButton>
@@ -652,9 +680,9 @@ export default function Customers({ dark }) {
           {payData && (
             <Box display="flex" gap={1.5} flexWrap="wrap" mb={2}>
               {[
-                { label: "Total Billed", value: `₹${Number(payData.totalBilled).toFixed(2)}`,  color: "#2563eb", bg: dark ? "#1e3a5f" : "#eff6ff" },
-                { label: "Total Paid",   value: `₹${Number(payData.totalPaid).toFixed(2)}`,    color: "#16a34a", bg: dark ? "#14532d" : "#f0fdf4" },
-                { label: "Outstanding",  value: `₹${Number(payData.outstanding).toFixed(2)}`,  color: payData.outstanding > 0 ? "#dc2626" : "#16a34a", bg: payData.outstanding > 0 ? (dark ? "#450a0a" : "#fee2e2") : (dark ? "#14532d" : "#f0fdf4") },
+                { label: "Total Billed", value: `Rs.${Number(payData.totalBilled).toFixed(2)}`,  color: "#2563eb", bg: dark ? "#1e3a5f" : "#eff6ff" },
+                { label: "Total Paid",   value: `Rs.${Number(payData.totalPaid).toFixed(2)}`,    color: "#16a34a", bg: dark ? "#14532d" : "#f0fdf4" },
+                { label: "Outstanding",  value: `Rs.${Number(payData.outstanding).toFixed(2)}`,  color: payData.outstanding > 0 ? "#dc2626" : "#16a34a", bg: payData.outstanding > 0 ? (dark ? "#450a0a" : "#fee2e2") : (dark ? "#14532d" : "#f0fdf4") },
               ].map((s) => (
                 <Box key={s.label} sx={{ flex: "1 1 100px", px: 1.5, py: 0.8, borderRadius: 2, background: s.bg }}>
                   <Typography fontSize={10} color={textSecondary}>{s.label}</Typography>
@@ -668,15 +696,15 @@ export default function Customers({ dark }) {
           <Box sx={{ p: 1.5, borderRadius: 2, border: `1px solid ${border}`, background: bgCard, mb: 2 }}>
             <Typography fontWeight={700} fontSize={13} color={textPrimary} mb={1.5}>Mark Payment</Typography>
             <Box display="flex" gap={1} flexWrap="wrap" mb={1}>
-              <TextField size="small" label="Amount (₹)" type="number" value={payAmount}
+              <TextField size="small" label="Amount (Rs.)" type="number" value={payAmount}
                 onChange={(e) => setPayAmount(e.target.value)}
                 sx={{ flex: "1 1 100px", "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }} />
               <Select size="small" value={payMethod} onChange={(e) => setPayMethod(e.target.value)}
                 sx={{ flex: "1 1 110px", borderRadius: 2, fontSize: 13 }}>
-                <MenuItem value="cash"    sx={{ fontSize: 13 }}>💵 Cash</MenuItem>
-                <MenuItem value="phonePe" sx={{ fontSize: 13 }}>📱 PhonePe</MenuItem>
-                <MenuItem value="upi"     sx={{ fontSize: 13 }}>🔗 UPI</MenuItem>
-                <MenuItem value="other"   sx={{ fontSize: 13 }}>🏦 Other</MenuItem>
+                <MenuItem value="cash" sx={{ fontSize: 13 }}>Cash</MenuItem>
+                <MenuItem value="phonePe" sx={{ fontSize: 13 }}>PhonePe</MenuItem>
+                <MenuItem value="upi" sx={{ fontSize: 13 }}>UPI</MenuItem>
+                <MenuItem value="other" sx={{ fontSize: 13 }}>Other</MenuItem>
               </Select>
             </Box>
             <TextField size="small" label="Notes (optional)" value={payNotes}
@@ -698,7 +726,7 @@ export default function Customers({ dark }) {
             <Button variant="contained" fullWidth disabled={paySubmitting || !payAmount} onClick={submitPayment}
               startIcon={paySubmitting ? <CircularProgress size={14} color="inherit" /> : <AccountBalanceWalletIcon fontSize="small" />}
               sx={{ textTransform: "none", fontWeight: 700, fontSize: 13, borderRadius: "8px", background: "#16a34a", "&:hover": { background: "#15803d" } }}>
-              {payUploading ? "Uploading…" : paySubmitting ? "Recording…" : "Record Payment"}
+              {payUploading ? "Uploading..." : paySubmitting ? "Recording..." : "Record Payment"}
             </Button>
           </Box>
 
@@ -731,7 +759,7 @@ export default function Customers({ dark }) {
                         sx={{ background: isRevoked ? (dark ? "#1a0a0a" : "#fff5f5") : isVerified ? (dark ? "#0f2d1a" : "#f0fdf4") : "inherit", "&:hover": { background: bgCard } }}>
                         <TableCell sx={{ fontSize: 12, color: textPrimary, borderColor: border }}>{fmtDate(String(p.payment_date).slice(0, 10))}</TableCell>
                         <TableCell sx={{ fontSize: 12, fontWeight: 700, color: isRevoked ? "#ef4444" : "#16a34a", borderColor: border, textDecoration: isRevoked ? "line-through" : "none" }}>
-                          ₹{Number(p.amount).toFixed(2)}
+                          Rs.{Number(p.amount).toFixed(2)}
                         </TableCell>
                         <TableCell sx={{ fontSize: 12, color: textPrimary, borderColor: border }}>{ml}</TableCell>
                         <TableCell sx={{ fontSize: 11, borderColor: border }}>
@@ -744,7 +772,7 @@ export default function Customers({ dark }) {
                               color: isRevoked ? "#dc2626" : isVerified ? "#16a34a" : p.recorded_by === "customer" ? "#2563eb" : "#16a34a" }} />
                         </TableCell>
                         <TableCell sx={{ fontSize: 11, color: textSecondary, borderColor: border, maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {p.notes || "—"}
+                          {p.notes || "-"}
                         </TableCell>
                         <TableCell sx={{ borderColor: border, p: 0.5, whiteSpace: "nowrap" }}>
                           {p.screenshot_url && (
@@ -764,7 +792,7 @@ export default function Customers({ dark }) {
                             </Tooltip>
                           )}
                           {!isRevoked && (
-                            <Tooltip title="Revoke — reset orders to unpaid" arrow>
+                            <Tooltip title="Revoke - reset orders to unpaid" arrow>
                               <IconButton size="small" onClick={() => revokePayment(p.payment_id)}
                                 sx={{ p: 0.3, color: "#f97316", "&:hover": { background: dark ? "#431407" : "#fff7ed" } }}>
                                 <BlockIcon sx={{ fontSize: 14 }} />
@@ -802,3 +830,10 @@ export default function Customers({ dark }) {
     </Box>
   )
 }
+
+
+
+
+
+
+

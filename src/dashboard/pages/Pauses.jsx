@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react"
+﻿import { useEffect, useState } from "react"
 import {
-  Box, Typography, Card, CardContent, Chip,
+  Box, Typography, Paper, Card, CardContent, Chip,
   Skeleton, Divider, TextField, InputAdornment, Alert, Select, MenuItem
 } from "@mui/material"
 import PauseCircleIcon from "@mui/icons-material/PauseCircle"
@@ -94,6 +94,25 @@ export default function Pauses({ dark }) {
   return (
     <Box sx={{ background: pageBg, minHeight: "100vh", p: { xs: 1.5, sm: 2.5 } }}>
 
+      <Paper elevation={0} sx={{ p: 1.25, mb: 2, borderRadius: 4, border: `1px solid ${border}`, background: "linear-gradient(135deg, #ffffff 0%, #f7fbff 60%, #fffaf0 100%)", boxShadow: "0 10px 28px rgba(15,23,42,0.04)" }}>
+        <Box display="flex" alignItems="center" gap={0.8} mb={1.1}>
+          <EventIcon sx={{ fontSize: 17, color: "#64748b" }} />
+          <Typography fontSize={13} fontWeight={800} color="#334155">Filters</Typography>
+        </Box>
+        <Box display="flex" gap={1.2} flexWrap="wrap">
+          <TextField size="small" placeholder="Search by phone or address..." value={search} onChange={e => setSearch(e.target.value)} fullWidth slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: subText }} /></InputAdornment>, sx: { background: "#f8fafc", borderRadius: 3, fontSize: 13 } } }} sx={{ flex: "1 1 220px", "& .MuiOutlinedInput-root": { "& fieldset": { borderColor: border } } }} />
+          <Select size="small" displayEmpty value={apartmentFilter} onChange={(e) => { setApartmentFilter(e.target.value); setBlockFilter("") }} sx={{ minWidth: 180, background: "#f8fafc", borderRadius: 3, fontSize: 13 }}>
+            <MenuItem value="">All Locations</MenuItem>
+            <MenuItem value={INDIVIDUAL_VALUE}>Individual Houses</MenuItem>
+            {apartments.map((name) => (<MenuItem key={name} value={name}>{name}</MenuItem>))}
+          </Select>
+          <Select size="small" displayEmpty value={blockFilter} disabled={!apartmentFilter || apartmentFilter === INDIVIDUAL_VALUE} onChange={(e) => setBlockFilter(e.target.value)} sx={{ minWidth: 160, background: "#f8fafc", borderRadius: 3, fontSize: 13 }} startAdornment={(<InputAdornment position="start"><GridViewIcon fontSize="small" sx={{ color: subText, ml: 0.5 }} /></InputAdornment>)}>
+            <MenuItem value="">All Blocks</MenuItem>
+            {blocks.map((name) => (<MenuItem key={name} value={name}>{name}</MenuItem>))}
+          </Select>
+        </Box>
+      </Paper>
+
       {/* Header */}
       <Box mb={3}>
         <Typography variant="h6" fontWeight={700} color={dark ? "#f1f5f9" : "#111827"}>
@@ -128,58 +147,6 @@ export default function Pauses({ dark }) {
             </CardContent>
           </Card>
         ))}
-      </Box>
-
-      {/* Search */}
-      <Box mb={2.5} display="flex" gap={1.2} flexWrap="wrap">
-        <TextField
-          size="small"
-          placeholder="Search by phone or address…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          fullWidth
-          slotProps={{
-            input: {
-              startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: subText }} /></InputAdornment>,
-              sx: { background: cardBg, borderRadius: 2, fontSize: 13 }
-            }
-          }}
-          sx={{ flex: "1 1 220px", "& .MuiOutlinedInput-root": { "& fieldset": { borderColor: border } } }}
-        />
-        <Select
-          size="small"
-          displayEmpty
-          value={apartmentFilter}
-          onChange={(e) => {
-            setApartmentFilter(e.target.value)
-            setBlockFilter("")
-          }}
-          sx={{ minWidth: 180, background: cardBg, borderRadius: 2, fontSize: 13 }}
-        >
-          <MenuItem value="">All Locations</MenuItem>
-          <MenuItem value={INDIVIDUAL_VALUE}>Individual Houses</MenuItem>
-          {apartments.map((name) => (
-            <MenuItem key={name} value={name}>{name}</MenuItem>
-          ))}
-        </Select>
-        <Select
-          size="small"
-          displayEmpty
-          value={blockFilter}
-          disabled={!apartmentFilter || apartmentFilter === INDIVIDUAL_VALUE}
-          onChange={(e) => setBlockFilter(e.target.value)}
-          sx={{ minWidth: 160, background: cardBg, borderRadius: 2, fontSize: 13 }}
-          startAdornment={(
-            <InputAdornment position="start">
-              <GridViewIcon fontSize="small" sx={{ color: subText, ml: 0.5 }} />
-            </InputAdornment>
-          )}
-        >
-          <MenuItem value="">All Blocks</MenuItem>
-          {blocks.map((name) => (
-            <MenuItem key={name} value={name}>{name}</MenuItem>
-          ))}
-        </Select>
       </Box>
 
       {/* List */}
@@ -294,3 +261,8 @@ export default function Pauses({ dark }) {
     </Box>
   )
 }
+
+
+
+
+

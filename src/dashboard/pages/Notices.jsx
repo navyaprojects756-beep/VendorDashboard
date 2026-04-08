@@ -26,6 +26,8 @@ import SendIcon from "@mui/icons-material/Send"
 import RefreshIcon from "@mui/icons-material/Refresh"
 import WarningAmberIcon from "@mui/icons-material/WarningAmber"
 import HistoryIcon from "@mui/icons-material/History"
+import CalendarTodayIcon from "@mui/icons-material/CalendarToday"
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
 
 const INDIVIDUAL_VALUE = "__individual__"
 
@@ -87,6 +89,7 @@ export default function Notices({ dark }) {
   const [blocks, setBlocks] = useState([])
   const [result, setResult] = useState(null)
   const [error, setError] = useState("")
+  const [historyExpanded, setHistoryExpanded] = useState(false)
 
   const border = dark ? "#1e293b" : "#e5e7eb"
   const bg = dark ? "#0f172a" : "#ffffff"
@@ -173,6 +176,40 @@ export default function Notices({ dark }) {
 
   return (
     <Box sx={{ maxWidth: 1080, margin: "auto", px: { xs: 1, sm: 2 }, py: { xs: 2, sm: 3 } }}>
+      <Paper elevation={0} sx={{ p: 1.25, mb: 2, borderRadius: 4, border: `1px solid ${border}`, background: "linear-gradient(135deg, #ffffff 0%, #f7fbff 60%, #fffaf0 100%)", boxShadow: "0 10px 28px rgba(15,23,42,0.04)" }}>
+        <Stack spacing={1.1}>
+          <Box display="flex" alignItems="center" gap={0.8}>
+            <CalendarTodayIcon sx={{ fontSize: 17, color: "#64748b" }} />
+            <Typography fontSize={13} fontWeight={800} color="#334155">Filters</Typography>
+          </Box>
+          <Box display="grid" gridTemplateColumns={{ xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "minmax(0, 1.2fr) repeat(3, minmax(0, 0.9fr))" }} gap={1}>
+            <TextField size="small" placeholder="Search name, phone or address..." value={search} onChange={(e) => setSearch(e.target.value)} InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: textSecondary }} /></InputAdornment> }} sx={{ "& .MuiOutlinedInput-root": { borderRadius: 3, fontSize: 13, background: "#f8fafc" } }} />
+            <Select size="small" value={locationFilter} displayEmpty onChange={(e) => { setLocationFilter(e.target.value); setBlockFilter("") }} startAdornment={<InputAdornment position="start">{locationFilter === INDIVIDUAL_VALUE ? <HomeIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /> : <ApartmentIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} />}</InputAdornment>} sx={{ borderRadius: 3, fontSize: 13, background: "#f8fafc" }}>
+              <MenuItem value="">All Locations</MenuItem>
+              <MenuItem value={INDIVIDUAL_VALUE}>Individual Houses</MenuItem>
+              {(config.apartments || []).map((name) => <MenuItem key={name} value={name}>{name}</MenuItem>)}
+            </Select>
+            <Select size="small" value={blockFilter} displayEmpty disabled={!locationFilter || locationFilter === INDIVIDUAL_VALUE} onChange={(e) => setBlockFilter(e.target.value)} startAdornment={<InputAdornment position="start"><GridViewIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /></InputAdornment>} sx={{ borderRadius: 3, fontSize: 13, background: "#f8fafc" }}>
+              <MenuItem value="">All Blocks</MenuItem>
+              {blocks.map((name) => <MenuItem key={name} value={name}>{name}</MenuItem>)}
+            </Select>
+            <ToggleButtonGroup size="small" exclusive value={dateMode} onChange={(_, value) => value && setDateMode(value)} sx={{ display: "flex", flexWrap: "nowrap", gap: 0.65, overflowX: "auto", pb: 0.25, "& .MuiToggleButton-root": { borderRadius: 2.5, border: "1px solid #d7e0ea !important", textTransform: "none", px: 1.2, py: 0.7, fontSize: 12, fontWeight: 700, color: "#475569", background: "#fff", whiteSpace: "nowrap", flexShrink: 0 }, "& .Mui-selected": { background: "#1d4ed8 !important", color: "#fff !important", boxShadow: "0 8px 18px rgba(29,78,216,0.22)" } }}>
+              <ToggleButton value="today">Today</ToggleButton>
+              <ToggleButton value="month">This Month</ToggleButton>
+              <ToggleButton value="custom">Custom</ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+          {dateMode === "custom" ? (
+            <Box display="grid" gridTemplateColumns={{ xs: "1fr", sm: "repeat(2, minmax(0, 180px))" }} gap={1}>
+              <TextField size="small" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} sx={{ "& .MuiOutlinedInput-root": { borderRadius: 3 } }} />
+              <TextField size="small" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} sx={{ "& .MuiOutlinedInput-root": { borderRadius: 3 } }} />
+            </Box>
+          ) : (
+            <Chip icon={<HistoryIcon />} label={monthRange.label && dateMode === "month" ? monthRange.label : formatISTDate(fromDate)} sx={{ borderRadius: 2.5, alignSelf: "flex-start", height: 30, background: "#eef4ff", color: "#1d4ed8", border: "1px solid #bfdbfe" }} />
+          )}
+        </Stack>
+      </Paper>
+
       <Box display="flex" alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" mb={1.5} gap={1.5} flexWrap="wrap">
         <Box display="flex" alignItems="center" gap={1.2}>
           <Box sx={{ width: 34, height: 34, borderRadius: "10px", background: "linear-gradient(135deg,#7c3aed,#a855f7)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -196,65 +233,6 @@ export default function Notices({ dark }) {
           <StatTile label="Outstanding Total" value={`Rs.${summary.totalOutstanding.toFixed(0)}`} tone="green" dark={dark} />
         </Box>
       </Box>
-
-      <Paper elevation={0} sx={{ p: 1.25, mb: 1.5, borderRadius: 2.5, border: `1px solid ${border}`, background: bg }}>
-        <Stack spacing={1}>
-          <Typography fontWeight={700} fontSize={13} color={textPrimary}>Filters</Typography>
-          <Box display="grid" gridTemplateColumns={{ xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "minmax(0, 1.2fr) repeat(3, minmax(0, 0.9fr))" }} gap={1}>
-            <TextField
-              size="small"
-              placeholder="Search name, phone or address..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: textSecondary }} /></InputAdornment> }}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }}
-            />
-            <Select
-              size="small"
-              value={locationFilter}
-              displayEmpty
-              onChange={(e) => { setLocationFilter(e.target.value); setBlockFilter("") }}
-              startAdornment={<InputAdornment position="start">{locationFilter === INDIVIDUAL_VALUE ? <HomeIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /> : <ApartmentIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} />}</InputAdornment>}
-              sx={{ borderRadius: 2, fontSize: 13 }}
-            >
-              <MenuItem value="">All Locations</MenuItem>
-              <MenuItem value={INDIVIDUAL_VALUE}>Individual Houses</MenuItem>
-              {(config.apartments || []).map((name) => <MenuItem key={name} value={name}>{name}</MenuItem>)}
-            </Select>
-            <Select
-              size="small"
-              value={blockFilter}
-              displayEmpty
-              disabled={!locationFilter || locationFilter === INDIVIDUAL_VALUE}
-              onChange={(e) => setBlockFilter(e.target.value)}
-              startAdornment={<InputAdornment position="start"><GridViewIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /></InputAdornment>}
-              sx={{ borderRadius: 2, fontSize: 13 }}
-            >
-              <MenuItem value="">All Blocks</MenuItem>
-              {blocks.map((name) => <MenuItem key={name} value={name}>{name}</MenuItem>)}
-            </Select>
-            <ToggleButtonGroup
-              size="small"
-              exclusive
-              value={dateMode}
-              onChange={(_, value) => value && setDateMode(value)}
-              sx={{ flexWrap: "wrap", "& .MuiToggleButton-root": { px: 1.2, textTransform: "none", fontSize: 12 } }}
-            >
-              <ToggleButton value="today">Today</ToggleButton>
-              <ToggleButton value="month">This Month</ToggleButton>
-              <ToggleButton value="custom">Custom</ToggleButton>
-            </ToggleButtonGroup>
-          </Box>
-          {dateMode === "custom" ? (
-            <Box display="grid" gridTemplateColumns={{ xs: "1fr", sm: "repeat(2, minmax(0, 180px))" }} gap={1}>
-              <TextField size="small" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-              <TextField size="small" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-            </Box>
-          ) : (
-            <Chip icon={<HistoryIcon />} label={monthRange.label && dateMode === "month" ? monthRange.label : formatISTDate(fromDate)} variant="outlined" sx={{ borderRadius: 2, alignSelf: "flex-start", height: 30 }} />
-          )}
-        </Stack>
-      </Paper>
 
       <Paper elevation={0} sx={{ p: 1.5, mb: 2, borderRadius: 2.5, border: `1px solid ${border}`, background: bg }}>
         <Stack spacing={1.25}>
@@ -321,15 +299,17 @@ export default function Notices({ dark }) {
             <Stack spacing={1}>
               {audience.map((row) => (
                 <Paper key={`${row.customer_id}-${row.customer_phone}`} elevation={0} sx={{ p: 1.2, borderRadius: 2, border: `1px solid ${dark ? "#1f2937" : "#e5e7eb"}`, background: dark ? "#0b1220" : "#ffffff" }}>
-                  <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1}>
-                    <Box>
+                  <Stack direction="row" justifyContent="space-between" spacing={1.2} alignItems="flex-start">
+                    <Box minWidth={0} flex={1}>
                       <Typography fontWeight={800} fontSize={14} color={textPrimary}>{row.customer_name || row.customer_phone}</Typography>
                       <Typography fontSize={12} color={textSecondary}>{row.customer_phone}</Typography>
-                      <Typography fontSize={12.5} color={textSecondary} sx={{ mt: 0.5 }}>{row.address || "No address"}</Typography>
+                      <Typography fontSize={12.5} color={textSecondary} sx={{ mt: 0.65, textAlign: "left" }}>{row.address || "No address"}</Typography>
                     </Box>
-                    <Stack alignItems={{ xs: "flex-start", sm: "flex-end" }} spacing={0.5}>
-                      {toNum(row.outstanding) > 0 ? <Chip size="small" color="warning" label={`Outstanding Rs.${toNum(row.outstanding).toFixed(0)}`} /> : <Chip size="small" color="success" label="No outstanding" />}
-                    </Stack>
+                    {toNum(row.outstanding) > 0 ? (
+                      <Chip size="small" color="warning" label={`Outstanding Rs.${toNum(row.outstanding).toFixed(0)}`} sx={{ alignSelf: "flex-start", flexShrink: 0 }} />
+                    ) : (
+                      <Chip size="small" color="success" label="No outstanding" sx={{ alignSelf: "flex-start", flexShrink: 0 }} />
+                    )}
                   </Stack>
                 </Paper>
               ))}
@@ -338,18 +318,28 @@ export default function Notices({ dark }) {
         </Paper>
 
         <Paper elevation={0} sx={{ p: 1.5, borderRadius: 2.5, border: `1px solid ${border}`, background: bg }}>
-          <Typography fontWeight={800} fontSize={15} color={textPrimary} mb={1}>Recent Notice History</Typography>
-          {!history.length ? <Typography color={textSecondary}>No notices sent yet.</Typography> : (
+          <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
+            <Typography fontWeight={800} fontSize={15} color={textPrimary}>Recent Notice History</Typography>
+            <Button
+              size="small"
+              onClick={() => setHistoryExpanded((prev) => !prev)}
+              endIcon={<ExpandMoreIcon sx={{ transform: historyExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }} />}
+              sx={{ minWidth: "auto", textTransform: "none", fontWeight: 700, borderRadius: 2, px: 0.5 }}
+            >
+              {historyExpanded ? "Collapse" : "Expand"}
+            </Button>
+          </Stack>
+          {!historyExpanded ? null : !history.length ? <Typography color={textSecondary}>No notices sent yet.</Typography> : (
             <Stack spacing={1}>
               {history.map((item) => (
                 <Paper key={item.notice_batch_id} elevation={0} sx={{ p: 1.2, borderRadius: 2, border: `1px solid ${dark ? "#1f2937" : "#e5e7eb"}`, background: dark ? "#0b1220" : "#ffffff" }}>
                   <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1}>
-                    <Box>
+                    <Box minWidth={0}>
                       <Typography fontWeight={800} fontSize={14} color={textPrimary}>{item.template_display_name || item.template_key}</Typography>
                       <Typography fontSize={12} color={textSecondary}>{formatISTDate(item.created_on)} • Sent {item.sent_count} • Failed {item.failed_count}</Typography>
                       {item.reason_display_name ? <Typography fontSize={12.5} color={textSecondary}>Reason: {item.reason_display_name}</Typography> : null}
                     </Box>
-                    <Chip size="small" color={item.status === "completed" ? "success" : "warning"} label={item.status} />
+                    <Chip size="small" color={item.status === "completed" ? "success" : "warning"} label={item.status} sx={{ alignSelf: { xs: "flex-start", sm: "center" } }} />
                   </Stack>
                 </Paper>
               ))}
@@ -360,4 +350,7 @@ export default function Notices({ dark }) {
     </Box>
   )
 }
+
+
+
 

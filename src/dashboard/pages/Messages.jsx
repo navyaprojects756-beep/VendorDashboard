@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+﻿import { useEffect, useMemo, useRef, useState } from "react"
 import API, { getToken } from "../../services/api"
 import {
   Box, Typography, Paper, Chip, CircularProgress,
@@ -211,6 +211,80 @@ export default function Messages() {
 
   return (
     <Box sx={{ maxWidth: 1080, margin: "auto", px: { xs: 1, sm: 2 }, py: 3 }}>
+      <Paper elevation={0} sx={{ px: 1.5, py: 1.25, mb: 2, borderRadius: 4, border: "1px solid #dde5ef", background: "linear-gradient(135deg, #ffffff 0%, #f7fbff 60%, #fffaf0 100%)", boxShadow: "0 10px 28px rgba(15,23,42,0.04)" }}>
+        <Box display="flex" alignItems="center" gap={0.8} mb={1.1}>
+          <CalendarTodayIcon sx={{ fontSize: 17, color: "#64748b" }} />
+          <Typography fontSize={13} fontWeight={800} color="#334155">Filters</Typography>
+        </Box>
+        <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+          <TextField
+            size="small"
+            placeholder="Search name, phone, message or address..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: "text.disabled" }} /></InputAdornment>) }}
+            sx={{ flex: "1 1 220px", minWidth: 190, "& .MuiOutlinedInput-root": { borderRadius: 3, fontSize: 13, background: "#f8fafc" } }}
+          />
+          <ToggleButtonGroup
+            size="small"
+            exclusive
+            value={dateMode}
+            onChange={(_, value) => {
+              if (!value) return
+              setDateMode(value)
+              if (value !== "custom") {
+                const today = getISTDateStr(0)
+                setFromDate(today)
+                setToDate(today)
+              }
+            }}
+            sx={{
+              display: "flex",
+              flexWrap: "nowrap",
+              gap: 0.65,
+              overflowX: "auto",
+              pb: 0.25,
+              "& .MuiToggleButton-root": {
+                borderRadius: 2.5,
+                border: "1px solid #d7e0ea !important",
+                textTransform: "none",
+                px: 1.2,
+                py: 0.7,
+                fontSize: 12,
+                fontWeight: 700,
+                color: "#475569",
+                background: "#fff",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+              },
+              "& .Mui-selected": {
+                background: "#1d4ed8 !important",
+                color: "#fff !important",
+                boxShadow: "0 8px 18px rgba(29,78,216,0.22)",
+              },
+            }}>
+            <ToggleButton value="all">All</ToggleButton>
+            <ToggleButton value="today">Today</ToggleButton>
+            <ToggleButton value="custom">Custom</ToggleButton>
+          </ToggleButtonGroup>
+          {dateMode === "custom" && (
+            <Box display="flex" alignItems="center" gap={0.8} flexWrap="wrap">
+              <TextField type="date" size="small" label="From" value={fromDate} onChange={(e) => setFromDate(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ width: 142, "& .MuiOutlinedInput-root": { borderRadius: 3, fontSize: 13 } }} />
+              <TextField type="date" size="small" label="To" value={toDate} inputProps={{ min: fromDate }} onChange={(e) => setToDate(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ width: 142, "& .MuiOutlinedInput-root": { borderRadius: 3, fontSize: 13 } }} />
+            </Box>
+          )}
+          <Select size="small" value={locationFilter} displayEmpty onChange={(e) => { setLocationFilter(e.target.value); setBlockFilter("") }} startAdornment={(<InputAdornment position="start">{locationFilter === INDIVIDUAL_VALUE ? <HomeIcon fontSize="small" sx={{ color: "text.disabled", ml: 0.5 }} /> : <ApartmentIcon fontSize="small" sx={{ color: "text.disabled", ml: 0.5 }} />}</InputAdornment>)} sx={{ minWidth: 180, borderRadius: 3, fontSize: 13, background: "#f8fafc" }}>
+            <MenuItem value="">All Locations</MenuItem>
+            <MenuItem value={INDIVIDUAL_VALUE}>Individual Houses</MenuItem>
+            {apartments.map((name) => (<MenuItem key={name} value={name}>{name}</MenuItem>))}
+          </Select>
+          <Select size="small" value={blockFilter} displayEmpty disabled={!locationFilter || locationFilter === INDIVIDUAL_VALUE} onChange={(e) => setBlockFilter(e.target.value)} startAdornment={(<InputAdornment position="start"><GridViewIcon fontSize="small" sx={{ color: "text.disabled", ml: 0.5 }} /></InputAdornment>)} sx={{ minWidth: 150, borderRadius: 3, fontSize: 13, background: "#f8fafc" }}>
+            <MenuItem value="">All Blocks</MenuItem>
+            {blocks.map((name) => (<MenuItem key={name} value={name}>{name}</MenuItem>))}
+          </Select>
+        </Box>
+      </Paper>
+
       <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
         <Box display="flex" alignItems="center" gap={1}>
           <Badge badgeContent={totalUnread || null} color="error">
@@ -227,131 +301,6 @@ export default function Messages() {
           </IconButton>
         </Tooltip>
       </Box>
-
-      <Paper elevation={0} sx={{ px: 1.5, py: 1.2, mb: 2, borderRadius: 3, border: "1px solid #e5e7eb" }}>
-        <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
-          <TextField
-            size="small"
-            placeholder="Search name, phone, message or address..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" sx={{ color: "text.disabled" }} />
-                </InputAdornment>
-              ),
-            }}
-            sx={{ flex: "1 1 220px", minWidth: 190, "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }}
-          />
-
-          <Box display="flex" alignItems="center" gap={0.6}>
-            <CalendarTodayIcon sx={{ fontSize: 16, color: "text.disabled" }} />
-            <Typography fontSize={12} fontWeight={600} color="text.secondary">Date</Typography>
-          </Box>
-
-          <ToggleButtonGroup
-            size="small"
-            exclusive
-            value={dateMode}
-            onChange={(_, value) => {
-              if (!value) return
-              setDateMode(value)
-              if (value !== "custom") {
-                const today = getISTDateStr(0)
-                setFromDate(today)
-                setToDate(today)
-              }
-            }}
-            sx={{
-              "& .MuiToggleButton-root": {
-                border: "1px solid #e5e7eb",
-                color: "text.secondary",
-                textTransform: "none",
-                fontSize: 12,
-                fontWeight: 600,
-              },
-              "& .MuiToggleButton-root.Mui-selected": {
-                background: "#2563eb",
-                color: "white",
-                borderColor: "#2563eb",
-              },
-            }}
-          >
-            <ToggleButton value="all">All</ToggleButton>
-            <ToggleButton value="today">Today</ToggleButton>
-            <ToggleButton value="custom">Custom</ToggleButton>
-          </ToggleButtonGroup>
-
-          {dateMode === "custom" && (
-            <Box display="flex" alignItems="center" gap={0.8} flexWrap="wrap">
-              <TextField
-                type="date"
-                size="small"
-                label="From"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-                sx={{ width: 142, "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }}
-              />
-              <TextField
-                type="date"
-                size="small"
-                label="To"
-                value={toDate}
-                inputProps={{ min: fromDate }}
-                onChange={(e) => setToDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-                sx={{ width: 142, "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }}
-              />
-            </Box>
-          )}
-
-          <Select
-            size="small"
-            value={locationFilter}
-            displayEmpty
-            onChange={(e) => {
-              setLocationFilter(e.target.value)
-              setBlockFilter("")
-            }}
-            startAdornment={(
-              <InputAdornment position="start">
-                {locationFilter === INDIVIDUAL_VALUE
-                  ? <HomeIcon fontSize="small" sx={{ color: "text.disabled", ml: 0.5 }} />
-                  : <ApartmentIcon fontSize="small" sx={{ color: "text.disabled", ml: 0.5 }} />
-                }
-              </InputAdornment>
-            )}
-            sx={{ minWidth: 180, borderRadius: 2, fontSize: 13 }}
-          >
-            <MenuItem value="">All Locations</MenuItem>
-            <MenuItem value={INDIVIDUAL_VALUE}>Individual Houses</MenuItem>
-            {apartments.map((name) => (
-              <MenuItem key={name} value={name}>{name}</MenuItem>
-            ))}
-          </Select>
-
-          <Select
-            size="small"
-            value={blockFilter}
-            displayEmpty
-            disabled={!locationFilter || locationFilter === INDIVIDUAL_VALUE}
-            onChange={(e) => setBlockFilter(e.target.value)}
-            startAdornment={(
-              <InputAdornment position="start">
-                <GridViewIcon fontSize="small" sx={{ color: "text.disabled", ml: 0.5 }} />
-              </InputAdornment>
-            )}
-            sx={{ minWidth: 150, borderRadius: 2, fontSize: 13 }}
-          >
-            <MenuItem value="">All Blocks</MenuItem>
-            {blocks.map((name) => (
-              <MenuItem key={name} value={name}>{name}</MenuItem>
-            ))}
-          </Select>
-        </Box>
-      </Paper>
 
       <Paper elevation={0} sx={{ borderRadius: 3, border: "1px solid #e5e7eb", overflow: "hidden", display: "flex", height: "calc(100vh - 280px)", minHeight: 470 }}>
         {showList && (
@@ -551,4 +500,6 @@ export default function Messages() {
     </Box>
   )
 }
+
+
 
