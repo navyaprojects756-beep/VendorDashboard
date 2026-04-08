@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import API, { getToken } from "../../services/api"
 import Toast from "../../components/Toast"
 import { formatISTDate, getISTDate, toISTDateStr } from "../../utils/istDate"
@@ -27,7 +27,7 @@ import CheckIcon                from "@mui/icons-material/Check"
 import BlockIcon                from "@mui/icons-material/Block"
 import CalendarTodayIcon        from "@mui/icons-material/CalendarToday"
 
-/* â”€â”€ date helpers â”€â”€ */
+/* ── date helpers ── */
 const toDateStr = (d) => {
   const y  = d.getFullYear()
   const m  = String(d.getMonth() + 1).padStart(2, "0")
@@ -68,9 +68,9 @@ const getOrderTotal = (order, rate) => {
   return itemTotal + getOrderDelivery(order)
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════
    MAIN
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════════ */
 export default function Customers({ dark }) {
   const [customers,  setCustomers]  = useState([])
   const [filtered,   setFiltered]   = useState([])
@@ -122,17 +122,17 @@ export default function Customers({ dark }) {
   const textPrimary   = dark ? "#f1f5f9" : "#111827"
   const textSecondary = dark ? "#94a3b8" : "#6b7280"
 
-  /* â”€â”€ load customers â”€â”€ */
+  /* ── load customers ── */
   useEffect(() => {
     API.get(`/customers?token=${getToken()}`)
       .then((r) => {
         setCustomers(r.data)
-        setApartments([...new Set(r.data.map((c) => c.apartment_name).filter(Boolean))])
+        setApartments([...new Map(r.data.filter((c) => c.address_type === "apartment" && c.apartment_id).map((c) => [String(c.apartment_id), { apartment_id: String(c.apartment_id), apartment_name: c.apartment_name }])).values()])
       })
       .finally(() => setLoading(false))
   }, [])
 
-  /* â”€â”€ filter â”€â”€ */
+  /* ── filter ── */
   useEffect(() => {
     let data = [...customers]
     if (search) {
@@ -144,16 +144,16 @@ export default function Customers({ dark }) {
       )
     }
     if (aptFilter === INDIVIDUAL_VALUE) data = data.filter((c) => c.address_type !== "apartment")
-    else if (aptFilter) data = data.filter((c) => c.apartment_name === aptFilter)
-    if (blockFilter) data = data.filter((c) => c.block_name === blockFilter)
+    else if (aptFilter) data = data.filter((c) => String(c.apartment_id || "") === String(aptFilter))
+    if (blockFilter) data = data.filter((c) => String(c.block_id || "") === String(blockFilter))
     setFiltered(data)
   }, [search, aptFilter, blockFilter, customers])
 
   const blocks = aptFilter && aptFilter !== INDIVIDUAL_VALUE
-    ? [...new Set(customers.filter((c) => c.apartment_name === aptFilter).map((c) => c.block_name).filter(Boolean))]
+    ? [...new Map(customers.filter((c) => String(c.apartment_id || "") === String(aptFilter) && c.block_id).map((c) => [String(c.block_id), { block_id: String(c.block_id), block_name: c.block_name }])).values()]
     : []
 
-  /* â”€â”€ invoice dialog â”€â”€ */
+  /* ── invoice dialog ── */
   const fetchInvoice = async (customerId) => {
     setInvLoading(true); setInvoiceData(null)
     try {
@@ -167,7 +167,7 @@ export default function Customers({ dark }) {
     fetchInvoice(customer.customer_id)
   }
 
-  /* â”€â”€ PDF download â”€â”€ */
+  /* ── PDF download ── */
   const downloadPDF = async (customerId, phone) => {
     const url = `${import.meta.env.VITE_API_BASE_URL}/customers/${customerId}/invoice/pdf?token=${getToken()}&from=${range.from}&to=${range.to}`
     const res = await fetch(url)
@@ -193,7 +193,7 @@ export default function Customers({ dark }) {
     catch (err) { setToast({ open: true, message: err.message, type: "error" }) }
   }
 
-  /* â”€â”€ payment helpers â”€â”€ */
+  /* ── payment helpers ── */
   const fetchPayments = async (customerId) => {
     setPayLoading(true); setPayData(null)
     try {
@@ -274,10 +274,10 @@ export default function Customers({ dark }) {
     }
   }
 
-  /* â”€â”€ stats â”€â”€ */
+  /* ── stats ── */
   const activeCount = customers.filter((c) => c.subscription_status === "active").length
 
-  /* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ RENDER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+  /* ─────────────────────── RENDER ─────────────────────── */
   return (
     <Box sx={{ maxWidth: 780, margin: "auto", px: { xs: 1, sm: 2 }, py: 3 }}>
 
@@ -297,7 +297,7 @@ export default function Customers({ dark }) {
             sx={{ flex: "1 1 150px", borderRadius: 3, fontSize: 13, background: "#f8fafc" }}>
             <MenuItem value="">All Locations</MenuItem>
             <MenuItem value={INDIVIDUAL_VALUE}>Individual Houses</MenuItem>
-            {apartments.map((a) => <MenuItem key={a} value={a} sx={{ fontSize: 13 }}>{a}</MenuItem>)}
+            {apartments.map((a) => <MenuItem key={a.apartment_id} value={a.apartment_id} sx={{ fontSize: 13 }}>{a.apartment_name}</MenuItem>)}
           </Select>
           <Select size="small" value={blockFilter} displayEmpty
             disabled={!aptFilter || aptFilter === INDIVIDUAL_VALUE}
@@ -305,7 +305,7 @@ export default function Customers({ dark }) {
             startAdornment={<InputAdornment position="start"><GridViewIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /></InputAdornment>}
             sx={{ flex: "1 1 130px", borderRadius: 3, fontSize: 13, background: "#f8fafc" }}>
             <MenuItem value="">All Blocks</MenuItem>
-            {blocks.map((b) => <MenuItem key={b} value={b} sx={{ fontSize: 13 }}>{b}</MenuItem>)}
+            {blocks.map((b) => <MenuItem key={b.block_id} value={b.block_id} sx={{ fontSize: 13 }}>{b.block_name}</MenuItem>)}
           </Select>
         </Box>
         <Box mt={1.1} sx={{ border: "1px solid #e2e8f0", borderRadius: 3, px: 1, py: 1, background: "#fffdf8" }}>
@@ -431,7 +431,7 @@ export default function Customers({ dark }) {
                   )}
                 </Box>
 
-                {/* RIGHT â€” icon buttons only */}
+                {/* RIGHT — icon buttons only */}
                 <Box display="flex" alignItems="center" gap={0.6} flexShrink={0}>
                   {/* Download PDF */}
                   <Tooltip title="Download bill PDF" arrow>
@@ -471,7 +471,7 @@ export default function Customers({ dark }) {
         })}
       </Paper>
 
-      {/* â•â•â• BILL DETAILS DIALOG â•â•â• */}
+      {/* ═══ BILL DETAILS DIALOG ═══ */}
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth
         PaperProps={{ sx: { borderRadius: 3, background: bg } }}>
 
@@ -513,7 +513,7 @@ export default function Customers({ dark }) {
 
             return (
               <>
-                {/* â”€â”€ Summary chips â”€â”€ */}
+                {/* ── Summary chips ── */}
                 <Box display="flex" gap={1} flexWrap="wrap" mb={2}>
                   {[
                     { label: `${delivered.length} deliveries`, color: "#2563eb", bg: dark ? "#1e3a5f" : "#eff6ff" },
@@ -662,7 +662,7 @@ export default function Customers({ dark }) {
         </DialogActions>
       </Dialog>
 
-      {/* â•â•â• PAYMENTS DIALOG â•â•â• */}
+      {/* ═══ PAYMENTS DIALOG ═══ */}
       <Dialog open={payDialogOpen} onClose={() => setPayDialogOpen(false)} maxWidth="sm" fullWidth
         PaperProps={{ sx: { borderRadius: 3, background: bg } }}>
 
@@ -830,6 +830,7 @@ export default function Customers({ dark }) {
     </Box>
   )
 }
+
 
 
 

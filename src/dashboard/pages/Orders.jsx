@@ -138,7 +138,7 @@ export default function Orders({ dark }) {
     const nextOrders = res.data.orders || []
     setOrders(nextOrders)
     setApartments([
-      ...new Set(nextOrders.map((o) => o.apartment_name || o.apartment).filter(Boolean)),
+      ...new Map(nextOrders.map((o) => o.apartment_name || o.apartment).filter(Boolean)),
     ])
   }
 
@@ -189,7 +189,7 @@ export default function Orders({ dark }) {
     }
 
     if (block) {
-      data = data.filter((o) => o.block_name === block)
+      data = data.filter((o) => String(o.block_id || "") === String(block))
     }
 
     return data
@@ -201,12 +201,12 @@ export default function Orders({ dark }) {
       return
     }
     setBlocks([
-      ...new Set(
+      ...new Map(
         orders
-          .filter((o) => (o.apartment_name || o.apartment) === apartment)
-          .map((o) => o.block_name)
+          .filter((o) => String(o.apartment_id || "") === String(apartment) && o.block_id)
+          .map((o) => [String(o.block_id), { block_id: String(o.block_id), block_name: o.block_name }])
           .filter(Boolean)
-      ),
+      ).values(),
     ])
   }, [apartment, orders])
 
@@ -461,7 +461,7 @@ export default function Orders({ dark }) {
               >
                 <MenuItem value="">All Locations</MenuItem>
                 <MenuItem value={INDIVIDUAL_VALUE}>Individual Houses</MenuItem>
-                {apartments.map((name) => <MenuItem key={name} value={name}>{name}</MenuItem>)}
+                {apartments.map((item) => <MenuItem key={item.apartment_id} value={item.apartment_id}>{item.apartment_name}</MenuItem>)}
               </Select>
               <Select
                 size="small"
@@ -478,7 +478,7 @@ export default function Orders({ dark }) {
                 }}
               >
                 <MenuItem value="">All Blocks</MenuItem>
-                {blocks.map((name) => <MenuItem key={name} value={name}>{name}</MenuItem>)}
+                {blocks.map((item) => <MenuItem key={item.block_id} value={item.block_id}>{item.block_name}</MenuItem>)}
               </Select>
             </Stack>
           </Stack>
@@ -715,3 +715,4 @@ export default function Orders({ dark }) {
     </Box>
   )
 }
+

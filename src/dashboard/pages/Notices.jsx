@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import API, { getToken } from "../../services/api"
 import { formatISTDate, getISTDate, getISTDateStr } from "../../utils/istDate"
 import {
@@ -124,7 +124,7 @@ export default function Notices({ dark }) {
     try {
       const [cfg, aud, hist] = await Promise.all([
         API.get(`/notices/config?token=${getToken()}`),
-        API.get(`/notices/audience?token=${getToken()}&from=${fromDate}&to=${toDate}&search=${encodeURIComponent(search)}&location=${encodeURIComponent(locationFilter)}&block=${encodeURIComponent(blockFilter)}&template_key=${templateKey}`),
+        API.get(`/notices/audience?token=${getToken()}&from=${fromDate}&to=${toDate}&location_id=${encodeURIComponent(locationFilter)}&block_id=${encodeURIComponent(blockFilter)}&template_key=${templateKey}`),
         API.get(`/notices/history?token=${getToken()}`),
       ])
       setConfig(cfg.data)
@@ -142,7 +142,20 @@ export default function Notices({ dark }) {
 
   useEffect(() => {
     loadAll()
-  }, [fromDate, toDate, templateKey, locationFilter, blockFilter, search])
+  }, [fromDate, toDate, templateKey, locationFilter, blockFilter])
+
+  const filteredAudience = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return audience
+    return audience.filter((row) => [row.customer_name, row.customer_phone, row.address].some((value) => String(value || "").toLowerCase().includes(q)))
+  }, [audience, search])
+
+  const filteredSummary = useMemo(() => filteredAudience.reduce((acc, row) => {
+    acc.totalCustomers += 1
+    acc.notPaidCustomers += toNum(row.outstanding) > 0 ? 1 : 0
+    acc.totalOutstanding += toNum(row.outstanding)
+    return acc
+  }, { totalCustomers: 0, notPaidCustomers: 0, totalOutstanding: 0 }), [filteredAudience])
 
   const handleSend = async () => {
     setSending(true)
@@ -157,9 +170,9 @@ export default function Notices({ dark }) {
         notice_to: noticeTo,
         filter_from: fromDate,
         filter_to: toDate,
-        search,
-        location: locationFilter,
-        block: blockFilter,
+        location_id: locationFilter || null,
+        block_id: blockFilter || null,
+        recipient_ids: filteredAudience.map((row) => row.customer_id),
       }
       const res = await API.post(`/notices/send?token=${getToken()}`, payload)
       setResult(res.data)
@@ -187,11 +200,11 @@ export default function Notices({ dark }) {
             <Select size="small" value={locationFilter} displayEmpty onChange={(e) => { setLocationFilter(e.target.value); setBlockFilter("") }} startAdornment={<InputAdornment position="start">{locationFilter === INDIVIDUAL_VALUE ? <HomeIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /> : <ApartmentIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} />}</InputAdornment>} sx={{ borderRadius: 3, fontSize: 13, background: "#f8fafc" }}>
               <MenuItem value="">All Locations</MenuItem>
               <MenuItem value={INDIVIDUAL_VALUE}>Individual Houses</MenuItem>
-              {(config.apartments || []).map((name) => <MenuItem key={name} value={name}>{name}</MenuItem>)}
+              {(config.apartments || []).map((item) => <MenuItem key={item.apartment_id} value={item.apartment_id}>{item.apartment_name}</MenuItem>)}
             </Select>
             <Select size="small" value={blockFilter} displayEmpty disabled={!locationFilter || locationFilter === INDIVIDUAL_VALUE} onChange={(e) => setBlockFilter(e.target.value)} startAdornment={<InputAdornment position="start"><GridViewIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /></InputAdornment>} sx={{ borderRadius: 3, fontSize: 13, background: "#f8fafc" }}>
               <MenuItem value="">All Blocks</MenuItem>
-              {blocks.map((name) => <MenuItem key={name} value={name}>{name}</MenuItem>)}
+              {blocks.map((item) => <MenuItem key={item.block_id} value={item.block_id}>{item.block_name}</MenuItem>)}
             </Select>
             <ToggleButtonGroup size="small" exclusive value={dateMode} onChange={(_, value) => value && setDateMode(value)} sx={{ display: "flex", flexWrap: "nowrap", gap: 0.65, overflowX: "auto", pb: 0.25, "& .MuiToggleButton-root": { borderRadius: 2.5, border: "1px solid #d7e0ea !important", textTransform: "none", px: 1.2, py: 0.7, fontSize: 12, fontWeight: 700, color: "#475569", background: "#fff", whiteSpace: "nowrap", flexShrink: 0 }, "& .Mui-selected": { background: "#1d4ed8 !important", color: "#fff !important", boxShadow: "0 8px 18px rgba(29,78,216,0.22)" } }}>
               <ToggleButton value="today">Today</ToggleButton>
@@ -227,10 +240,10 @@ export default function Notices({ dark }) {
       {result ? <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>Sent {result.sent_count} notices{result.failed_count ? `, ${result.failed_count} failed` : ""}.</Alert> : null}
 
       <Box display="grid" gridTemplateColumns={{ xs: "repeat(2, 1fr)", md: "repeat(3, 1fr)" }} gap={1} mb={1.5}>
-        <StatTile label="Filtered Customers" value={summary.totalCustomers} tone="blue" dark={dark} />
-        <StatTile label="Need To Pay" value={summary.notPaidCustomers} tone="orange" dark={dark} />
+        <StatTile label="Filtered Customers" value={filteredSummary.totalCustomers} tone="blue" dark={dark} />
+        <StatTile label="Need To Pay" value={filteredSummary.notPaidCustomers} tone="orange" dark={dark} />
         <Box gridColumn={{ xs: "1 / -1", md: "auto" }}>
-          <StatTile label="Outstanding Total" value={`Rs.${summary.totalOutstanding.toFixed(0)}`} tone="green" dark={dark} />
+          <StatTile label="Outstanding Total" value={`Rs.${filteredSummary.totalOutstanding.toFixed(0)}`} tone="green" dark={dark} />
         </Box>
       </Box>
 
@@ -274,14 +287,14 @@ export default function Notices({ dark }) {
             <Paper elevation={0} sx={{ p: 1.25, borderRadius: 2, background: dark ? "#111827" : "#f8fafc", border: `1px dashed ${border}` }}>
               <Typography fontWeight={700} fontSize={13} color={textPrimary}>{templateLabel}</Typography>
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
-                <Chip size="small" label={`Recipients: ${summary.totalCustomers}`} />
-                {templateKey === "payment_due_reminder" ? <Chip size="small" color="warning" label={`Need To Pay: ${summary.notPaidCustomers}`} /> : null}
+                <Chip size="small" label={`Recipients: ${filteredSummary.totalCustomers}`} />
+                {templateKey === "payment_due_reminder" ? <Chip size="small" color="warning" label={`Need To Pay: ${filteredSummary.notPaidCustomers}`} /> : null}
               </Stack>
               <Button
                 fullWidth
                 variant="contained"
                 startIcon={sending ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
-                disabled={sending || summary.totalCustomers === 0}
+                disabled={sending || filteredSummary.totalCustomers === 0}
                 onClick={handleSend}
                 sx={{ mt: 1.25, borderRadius: 2, textTransform: "none" }}
               >
@@ -295,9 +308,9 @@ export default function Notices({ dark }) {
       <Stack spacing={2}>
         <Paper elevation={0} sx={{ p: 1.5, borderRadius: 2.5, border: `1px solid ${border}`, background: bg }}>
           <Typography fontWeight={800} fontSize={15} color={textPrimary} mb={1}>Recipients</Typography>
-          {loading ? <Box py={5} textAlign="center"><CircularProgress /></Box> : audience.length === 0 ? <Typography color={textSecondary}>No customers match the selected filters.</Typography> : (
+          {loading ? <Box py={5} textAlign="center"><CircularProgress /></Box> : filteredAudience.length === 0 ? <Typography color={textSecondary}>No customers match the selected filters.</Typography> : (
             <Stack spacing={1}>
-              {audience.map((row) => (
+              {filteredAudience.map((row) => (
                 <Paper key={`${row.customer_id}-${row.customer_phone}`} elevation={0} sx={{ p: 1.2, borderRadius: 2, border: `1px solid ${dark ? "#1f2937" : "#e5e7eb"}`, background: dark ? "#0b1220" : "#ffffff" }}>
                   <Stack direction="row" justifyContent="space-between" spacing={1.2} alignItems="flex-start">
                     <Box minWidth={0} flex={1}>
@@ -336,7 +349,7 @@ export default function Notices({ dark }) {
                   <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1}>
                     <Box minWidth={0}>
                       <Typography fontWeight={800} fontSize={14} color={textPrimary}>{item.template_display_name || item.template_key}</Typography>
-                      <Typography fontSize={12} color={textSecondary}>{formatISTDate(item.created_on)} • Sent {item.sent_count} • Failed {item.failed_count}</Typography>
+                      <Typography fontSize={12} color={textSecondary}>{formatISTDate(item.created_on)} - Sent {item.sent_count} - Failed {item.failed_count}</Typography>
                       {item.reason_display_name ? <Typography fontSize={12.5} color={textSecondary}>Reason: {item.reason_display_name}</Typography> : null}
                     </Box>
                     <Chip size="small" color={item.status === "completed" ? "success" : "warning"} label={item.status} sx={{ alignSelf: { xs: "flex-start", sm: "center" } }} />
@@ -350,6 +363,7 @@ export default function Notices({ dark }) {
     </Box>
   )
 }
+
 
 
 

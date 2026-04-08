@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import API, { getToken } from "../../services/api"
 import {
   Box, Typography, Paper, Chip, CircularProgress,
@@ -140,13 +140,13 @@ export default function Messages() {
   const totalUnread = conversations.reduce((s, c) => s + (c.unread_count || 0), 0)
 
   const apartments = useMemo(
-    () => [...new Set(conversations.filter((c) => c.address_type === "apartment").map((c) => c.apartment_name).filter(Boolean))],
+    () => [...new Map(conversations.filter((c) => c.address_type === "apartment" && c.apartment_id).map((c) => [String(c.apartment_id), { apartment_id: String(c.apartment_id), apartment_name: c.apartment_name }])).values()],
     [conversations]
   )
 
   const blocks = useMemo(() => {
     if (!locationFilter || locationFilter === INDIVIDUAL_VALUE) return []
-    return [...new Set(conversations.filter((c) => c.apartment_name === locationFilter).map((c) => c.block_name).filter(Boolean))]
+    return [...new Map(conversations.filter((c) => String(c.apartment_id || "") === String(locationFilter) && c.block_id).map((c) => [String(c.block_id), { block_id: String(c.block_id), block_name: c.block_name }])).values()]
   }, [conversations, locationFilter])
 
   const filteredConversations = useMemo(() => {
@@ -163,8 +163,8 @@ export default function Messages() {
       if (!inDateRange) return false
 
       if (locationFilter === INDIVIDUAL_VALUE && c.address_type === "apartment") return false
-      if (locationFilter && locationFilter !== INDIVIDUAL_VALUE && c.apartment_name !== locationFilter) return false
-      if (blockFilter && c.block_name !== blockFilter) return false
+      if (locationFilter && locationFilter !== INDIVIDUAL_VALUE && String(c.apartment_id || "") !== String(locationFilter)) return false
+      if (blockFilter && String(c.block_id || "") !== String(blockFilter)) return false
 
       if (!search.trim()) return true
       const q = search.toLowerCase()
@@ -276,11 +276,11 @@ export default function Messages() {
           <Select size="small" value={locationFilter} displayEmpty onChange={(e) => { setLocationFilter(e.target.value); setBlockFilter("") }} startAdornment={(<InputAdornment position="start">{locationFilter === INDIVIDUAL_VALUE ? <HomeIcon fontSize="small" sx={{ color: "text.disabled", ml: 0.5 }} /> : <ApartmentIcon fontSize="small" sx={{ color: "text.disabled", ml: 0.5 }} />}</InputAdornment>)} sx={{ minWidth: 180, borderRadius: 3, fontSize: 13, background: "#f8fafc" }}>
             <MenuItem value="">All Locations</MenuItem>
             <MenuItem value={INDIVIDUAL_VALUE}>Individual Houses</MenuItem>
-            {apartments.map((name) => (<MenuItem key={name} value={name}>{name}</MenuItem>))}
+            {apartments.map((item) => (<MenuItem key={item.apartment_id} value={item.apartment_id}>{item.apartment_name}</MenuItem>))}
           </Select>
           <Select size="small" value={blockFilter} displayEmpty disabled={!locationFilter || locationFilter === INDIVIDUAL_VALUE} onChange={(e) => setBlockFilter(e.target.value)} startAdornment={(<InputAdornment position="start"><GridViewIcon fontSize="small" sx={{ color: "text.disabled", ml: 0.5 }} /></InputAdornment>)} sx={{ minWidth: 150, borderRadius: 3, fontSize: 13, background: "#f8fafc" }}>
             <MenuItem value="">All Blocks</MenuItem>
-            {blocks.map((name) => (<MenuItem key={name} value={name}>{name}</MenuItem>))}
+            {blocks.map((item) => (<MenuItem key={item.block_id} value={item.block_id}>{item.block_name}</MenuItem>))}
           </Select>
         </Box>
       </Paper>
@@ -500,6 +500,7 @@ export default function Messages() {
     </Box>
   )
 }
+
 
 
 

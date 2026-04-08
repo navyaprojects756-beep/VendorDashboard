@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import {
   Box, Typography, Paper, Card, CardContent, Chip,
   Skeleton, Divider, TextField, InputAdornment, Alert, Select, MenuItem
@@ -64,9 +64,9 @@ export default function Pauses({ dark }) {
 
   useEffect(() => { load() }, [])
 
-  const apartments = [...new Set(pauses.map((p) => p.apartment_name).filter(Boolean))]
+  const apartments = [...new Map(pauses.filter((p) => p.address_type === "apartment" && p.apartment_id).map((p) => [String(p.apartment_id), { apartment_id: String(p.apartment_id), apartment_name: p.apartment_name }])).values()]
   const blocks = apartmentFilter && apartmentFilter !== INDIVIDUAL_VALUE
-    ? [...new Set(pauses.filter((p) => p.apartment_name === apartmentFilter).map((p) => p.block_name).filter(Boolean))]
+    ? [...new Map(pauses.filter((p) => String(p.apartment_id || "") === String(apartmentFilter) && p.block_id).map((p) => [String(p.block_id), { block_id: String(p.block_id), block_name: p.block_name }])).values()]
     : []
 
   const filtered = pauses.filter((p) => {
@@ -78,8 +78,8 @@ export default function Pauses({ dark }) {
       !apartmentFilter ||
       (apartmentFilter === INDIVIDUAL_VALUE
         ? p.address_type !== "apartment"
-        : p.apartment_name === apartmentFilter)
-    const matchesBlock = !blockFilter || p.block_name === blockFilter
+        : String(p.apartment_id || "") === String(apartmentFilter))
+    const matchesBlock = !blockFilter || String(p.block_id || "") === String(blockFilter)
     return matchesSearch && matchesApartment && matchesBlock
   })
 
@@ -104,11 +104,11 @@ export default function Pauses({ dark }) {
           <Select size="small" displayEmpty value={apartmentFilter} onChange={(e) => { setApartmentFilter(e.target.value); setBlockFilter("") }} sx={{ minWidth: 180, background: "#f8fafc", borderRadius: 3, fontSize: 13 }}>
             <MenuItem value="">All Locations</MenuItem>
             <MenuItem value={INDIVIDUAL_VALUE}>Individual Houses</MenuItem>
-            {apartments.map((name) => (<MenuItem key={name} value={name}>{name}</MenuItem>))}
+            {apartments.map((item) => (<MenuItem key={item.apartment_id} value={item.apartment_id}>{item.apartment_name}</MenuItem>))}
           </Select>
           <Select size="small" displayEmpty value={blockFilter} disabled={!apartmentFilter || apartmentFilter === INDIVIDUAL_VALUE} onChange={(e) => setBlockFilter(e.target.value)} sx={{ minWidth: 160, background: "#f8fafc", borderRadius: 3, fontSize: 13 }} startAdornment={(<InputAdornment position="start"><GridViewIcon fontSize="small" sx={{ color: subText, ml: 0.5 }} /></InputAdornment>)}>
             <MenuItem value="">All Blocks</MenuItem>
-            {blocks.map((name) => (<MenuItem key={name} value={name}>{name}</MenuItem>))}
+            {blocks.map((item) => (<MenuItem key={item.block_id} value={item.block_id}>{item.block_name}</MenuItem>))}
           </Select>
         </Box>
       </Paper>
@@ -261,6 +261,7 @@ export default function Pauses({ dark }) {
     </Box>
   )
 }
+
 
 
 

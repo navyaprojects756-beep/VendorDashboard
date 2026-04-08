@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import API, { getToken } from "../../services/api"
 import { formatISTDate, formatISTDateTime, getISTDate, getISTDateStr } from "../../utils/istDate"
 import {
@@ -153,19 +153,19 @@ export default function Payments({ dark }) {
   }, [payments, customerTotals])
 
   const apartments = useMemo(
-    () => [...new Set(sourceRows.filter((row) => row.address_type === "apartment").map((row) => row.apartment_name).filter(Boolean))],
+    () => [...new Map(sourceRows.filter((row) => row.address_type === "apartment" && row.apartment_id).map((row) => [String(row.apartment_id), { apartment_id: String(row.apartment_id), apartment_name: row.apartment_name }])).values()],
     [sourceRows]
   )
 
   const blocks = useMemo(() => {
     if (!locationFilter || locationFilter === INDIVIDUAL_VALUE) return []
-    return [...new Set(sourceRows.filter((row) => row.apartment_name === locationFilter).map((row) => row.block_name).filter(Boolean))]
+    return [...new Map(sourceRows.filter((row) => String(row.apartment_id || "") === String(locationFilter) && row.block_id).map((row) => [String(row.block_id), { block_id: String(row.block_id), block_name: row.block_name }])).values()]
   }, [sourceRows, locationFilter])
 
   const matchesBaseFilters = (row) => {
     if (locationFilter === INDIVIDUAL_VALUE && row.address_type === "apartment") return false
-    if (locationFilter && locationFilter !== INDIVIDUAL_VALUE && row.apartment_name !== locationFilter) return false
-    if (blockFilter && row.block_name !== blockFilter) return false
+    if (locationFilter && locationFilter !== INDIVIDUAL_VALUE && String(row.apartment_id || "") !== String(locationFilter)) return false
+    if (blockFilter && String(row.block_id || "") !== String(blockFilter)) return false
     if (!search.trim()) return true
     const q = search.toLowerCase()
     return [row.customer_name, row.customer_phone, row.address, row.apartment_name, row.block_name, row.payment_method, row.notes]
@@ -254,11 +254,11 @@ export default function Payments({ dark }) {
             <Select size="small" value={locationFilter} displayEmpty onChange={(e) => { setLocationFilter(e.target.value); setBlockFilter("") }} startAdornment={<InputAdornment position="start">{locationFilter === INDIVIDUAL_VALUE ? <HomeIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /> : <ApartmentIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} />}</InputAdornment>} sx={{ minWidth: { xs: "100%", md: 210 }, borderRadius: 3, fontSize: 13, background: "#f8fafc" }}>
               <MenuItem value="">All Locations</MenuItem>
               <MenuItem value={INDIVIDUAL_VALUE}>Individual Houses</MenuItem>
-              {apartments.map((name) => <MenuItem key={name} value={name}>{name}</MenuItem>)}
+              {apartments.map((item) => <MenuItem key={item.apartment_id} value={item.apartment_id}>{item.apartment_name}</MenuItem>)}
             </Select>
             <Select size="small" value={blockFilter} displayEmpty disabled={!locationFilter || locationFilter === INDIVIDUAL_VALUE} onChange={(e) => setBlockFilter(e.target.value)} startAdornment={<InputAdornment position="start"><GridViewIcon fontSize="small" sx={{ color: textSecondary, ml: 0.5 }} /></InputAdornment>} sx={{ minWidth: { xs: "100%", md: 180 }, borderRadius: 3, fontSize: 13, background: "#f8fafc" }}>
               <MenuItem value="">All Blocks</MenuItem>
-              {blocks.map((name) => <MenuItem key={name} value={name}>{name}</MenuItem>)}
+              {blocks.map((item) => <MenuItem key={item.block_id} value={item.block_id}>{item.block_name}</MenuItem>)}
             </Select>
           </Stack>
           <Stack direction={{ xs: "column", md: "row" }} spacing={1.2} alignItems={{ xs: "stretch", md: "center" }}>
@@ -430,6 +430,7 @@ export default function Payments({ dark }) {
     </Box>
   )
 }
+
 
 
 
