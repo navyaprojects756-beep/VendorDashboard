@@ -28,7 +28,7 @@ export function parseDateOnly(value) {
   return new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
 }
 
-export function formatISTDate(value, options = { day: "2-digit", month: "short", year: "numeric" }) {
+export function formatISTDate(value, options = { day: "2-digit", month: "2-digit", year: "numeric" }) {
   if (!value) return "-"
   const date = typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)
     ? parseDateOnly(value)
@@ -37,7 +37,7 @@ export function formatISTDate(value, options = { day: "2-digit", month: "short",
   return new Intl.DateTimeFormat("en-IN", { timeZone: IST_TIME_ZONE, ...options }).format(date)
 }
 
-export function formatISTDateTime(value, options = { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) {
+export function formatISTDateTime(value, options = { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) {
   if (!value) return ""
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ""

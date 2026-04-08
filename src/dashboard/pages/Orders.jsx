@@ -167,7 +167,7 @@ export default function Orders({ dark }) {
       const range = getMonthRange()
       return { ...range, label: "This Month" }
     }
-    return { from: fromDate, to: toDate, label: `${fromDate} to ${toDate}` }
+    return { from: fromDate, to: toDate, label: `${formatISTDate(fromDate)} to ${formatISTDate(toDate)}` }
   }, [dateMode, fromDate, toDate])
 
   const filtered = useMemo(() => {
@@ -192,7 +192,11 @@ export default function Orders({ dark }) {
       data = data.filter((o) => o.block_name === block)
     }
 
-    return data
+    return data.sort((a, b) => {
+      const deliveryRank = Number(!!a.is_delivered) - Number(!!b.is_delivered)
+      if (deliveryRank !== 0) return deliveryRank
+      return String(a.customer_name || "").localeCompare(String(b.customer_name || ""))
+    })
   }, [orders, effectiveRange, search, apartment, block])
 
   useEffect(() => {
@@ -311,6 +315,39 @@ export default function Orders({ dark }) {
         background: "linear-gradient(180deg, #f8fbff 0%, #ffffff 220px)",
       }}
     >
+      {isAdmin ? (
+        <Paper
+          elevation={0}
+          sx={{
+            mb: 2,
+            p: 1.2,
+            borderRadius: 4,
+            border: "1px solid #dbe7f3",
+            background: "#fff",
+            boxShadow: "0 10px 28px rgba(15,23,42,0.04)",
+          }}
+        >
+          <Button
+            fullWidth
+            variant="contained"
+            onClick={generate}
+            disabled={generating}
+            startIcon={<AutorenewIcon fontSize="small" sx={{ animation: generating ? "spin 1s linear infinite" : "none", "@keyframes spin": { "0%": { transform: "rotate(0deg)" }, "100%": { transform: "rotate(360deg)" } } }} />}
+            sx={{
+              textTransform: "none",
+              fontWeight: 800,
+              borderRadius: 3,
+              px: 2,
+              py: 1.05,
+              background: "linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)",
+              boxShadow: "0 12px 24px rgba(37,99,235,0.24)",
+            }}
+          >
+            {generating ? "Generating..." : "Generate Orders"}
+          </Button>
+        </Paper>
+      ) : null}
+
       <Paper
         elevation={0}
         sx={{
@@ -341,18 +378,23 @@ export default function Orders({ dark }) {
             value={dateMode}
             onChange={(_, val) => val && setDateMode(val)}
             sx={{
-              flexWrap: "wrap",
-              gap: 0.8,
+              display: "flex",
+              flexWrap: "nowrap",
+              gap: 0.65,
+              overflowX: "auto",
+              pb: 0.25,
               "& .MuiToggleButton-root": {
                 borderRadius: 2.5,
                 border: "1px solid #d7e0ea !important",
                 textTransform: "none",
-                px: 1.5,
-                py: 0.8,
-                fontSize: 12.5,
+                px: 1.2,
+                py: 0.7,
+                fontSize: 12,
                 fontWeight: 700,
                 color: "#475569",
                 background: "#fff",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
               },
               "& .Mui-selected": {
                 background: "#1d4ed8 !important",
@@ -364,7 +406,6 @@ export default function Orders({ dark }) {
             <ToggleButton value="yesterday">Yesterday</ToggleButton>
             <ToggleButton value="today">Today</ToggleButton>
             <ToggleButton value="tomorrow">Tomorrow</ToggleButton>
-            <ToggleButton value="week">This Week</ToggleButton>
             <ToggleButton value="month">This Month</ToggleButton>
             <ToggleButton value="custom">Custom</ToggleButton>
           </ToggleButtonGroup>
@@ -459,37 +500,15 @@ export default function Orders({ dark }) {
           boxShadow: "0 16px 40px rgba(15,23,42,0.06)",
         }}
       >
-        <Stack spacing={1.5}>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }}>
-            <Box>
-              <Typography fontWeight={900} fontSize={{ xs: 24, sm: 28 }} lineHeight={1.05} color="#16325c">
-                Orders
-              </Typography>
-              <Typography fontSize={13} color="#51627f" mt={0.6}>
-                Clear, simple order list for quick mobile use.
-              </Typography>
-            </Box>
-            {isAdmin ? (
-              <Button
-                variant="contained"
-                onClick={generate}
-                disabled={generating}
-                startIcon={<AutorenewIcon fontSize="small" sx={{ animation: generating ? "spin 1s linear infinite" : "none", "@keyframes spin": { "0%": { transform: "rotate(0deg)" }, "100%": { transform: "rotate(360deg)" } } }} />}
-                sx={{
-                  alignSelf: { xs: "flex-start", sm: "auto" },
-                  textTransform: "none",
-                  fontWeight: 800,
-                  borderRadius: 3,
-                  px: 2,
-                  py: 1.05,
-                  background: "linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)",
-                  boxShadow: "0 12px 24px rgba(37,99,235,0.28)",
-                }}
-              >
-                {generating ? "Generating..." : "Generate Orders"}
-              </Button>
-            ) : null}
-          </Stack>
+        <Stack spacing={1.2}>
+          <Box>
+            <Typography fontWeight={900} fontSize={{ xs: 24, sm: 28 }} lineHeight={1.05} color="#16325c">
+              Orders
+            </Typography>
+            <Typography fontSize={13} color="#51627f" mt={0.6}>
+              Clear, simple order list for quick mobile use.
+            </Typography>
+          </Box>
 
           <Stack direction="row" spacing={0.8} useFlexGap flexWrap="wrap">
             <Chip
@@ -511,17 +530,12 @@ export default function Orders({ dark }) {
         </Stack>
       </Paper>
 
-      <Paper elevation={0} sx={{ p: 1.5, mb: 2, borderRadius: 4, border: "1px solid #dde5ef", background: "#fff" }}>
-        <Stack spacing={1.2}>
-          <Typography fontSize={12.5} fontWeight={800} color="#475569">
-            Quick actions
-          </Typography>
-          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-            <Button size="small" variant="outlined" onClick={expandAllRows} sx={{ textTransform: "none", borderRadius: 2.5, fontWeight: 700 }}>Expand all</Button>
-            <Button size="small" variant="outlined" onClick={collapseAllRows} sx={{ textTransform: "none", borderRadius: 2.5, fontWeight: 700 }}>Collapse all</Button>
-            <Button size="small" variant="outlined" disabled={bulkLoading} onClick={() => bulkToggle(true)} startIcon={bulkLoading ? <CircularProgress size={13} /> : <CheckCircleOutlineIcon fontSize="small" />} sx={{ textTransform: "none", borderRadius: 2.5, fontWeight: 700, color: "#15803d", borderColor: "#4ade80" }}>Mark all delivered</Button>
-            <Button size="small" variant="outlined" disabled={bulkLoading} onClick={() => bulkToggle(false)} startIcon={bulkLoading ? <CircularProgress size={13} /> : <HighlightOffIcon fontSize="small" />} sx={{ textTransform: "none", borderRadius: 2.5, fontWeight: 700, color: "#c2410c", borderColor: "#fb923c" }}>Mark all pending</Button>
-          </Stack>
+      <Paper elevation={0} sx={{ p: 1.1, mb: 2, borderRadius: 4, border: "1px solid #dde5ef", background: "#fff" }}>
+        <Stack direction="row" spacing={0.8} useFlexGap flexWrap="wrap">
+          <Button size="small" variant="outlined" onClick={expandAllRows} sx={{ minWidth: "auto", textTransform: "none", borderRadius: 2.5, fontWeight: 700, px: 1.15, py: 0.45 }}>Expand</Button>
+          <Button size="small" variant="outlined" onClick={collapseAllRows} sx={{ minWidth: "auto", textTransform: "none", borderRadius: 2.5, fontWeight: 700, px: 1.15, py: 0.45 }}>Collapse</Button>
+          <Button size="small" variant="outlined" disabled={bulkLoading} onClick={() => bulkToggle(true)} startIcon={bulkLoading ? <CircularProgress size={13} /> : <CheckCircleOutlineIcon fontSize="small" />} sx={{ minWidth: "auto", textTransform: "none", borderRadius: 2.5, fontWeight: 700, px: 1.15, py: 0.45, color: "#15803d", borderColor: "#4ade80" }}>All delivered</Button>
+          <Button size="small" variant="outlined" disabled={bulkLoading} onClick={() => bulkToggle(false)} startIcon={bulkLoading ? <CircularProgress size={13} /> : <HighlightOffIcon fontSize="small" />} sx={{ minWidth: "auto", textTransform: "none", borderRadius: 2.5, fontWeight: 700, px: 1.15, py: 0.45, color: "#c2410c", borderColor: "#fb923c" }}>All pending</Button>
         </Stack>
       </Paper>
 
@@ -536,7 +550,7 @@ export default function Orders({ dark }) {
         </Paper>
       ) : null}
 
-      <Paper elevation={0} sx={{ borderRadius: 4, border: "1px solid #dde5ef", overflow: "hidden", background: "#f8fbff" }}>
+      <Paper elevation={0} sx={{ p: 1, borderRadius: 4, border: "1px solid #dde5ef", background: "#f8fbff" }}>
         {filtered.length === 0 ? (
           <Box py={7} textAlign="center">
             <CalendarTodayIcon sx={{ fontSize: 36, color: "#d1d5db", mb: 1, display: "block", mx: "auto" }} />
@@ -549,32 +563,41 @@ export default function Orders({ dark }) {
           const orderTotal = items.reduce((sum, item) => sum + (toNum(item.quantity) * toNum(item.price_at_order)), 0) + orderDelivery
 
           return (
-            <Box key={order.order_id}>
+            <Box
+              key={order.order_id}
+              sx={{
+                mb: index !== filtered.length - 1 ? 1 : 0,
+                borderRadius: 3,
+                border: "1px solid #dde5ef",
+                overflow: "hidden",
+                background: "#fff",
+              }}
+            >
               <Box
                 sx={{
-                  px: { xs: 1.1, sm: 1.5 },
-                  py: 1.25,
+                  px: { xs: 1.1, sm: 1.4 },
+                  py: 1.1,
                   background: "#ffffff",
                   display: "flex",
                   flexDirection: "column",
-                  gap: 1,
+                  gap: 0.8,
                 }}
               >
-                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={1} sx={{ mb: 0.2 }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={1}>
                   <Box minWidth={0} flex={1}>
-                    <Typography fontWeight={900} fontSize={18} color="#0f172a" lineHeight={1.1}>
-                      {order.customer_name || "Customer"}
+                    <Typography fontWeight={900} fontSize={16.5} color="#0f172a" lineHeight={1.15} noWrap>
+                      {`${order.customer_name || "Customer"} - ${showPhone ? order.phone : `******* ${String(order.phone).slice(-3)}`}`}
                     </Typography>
                   </Box>
-                  <Stack direction="row" spacing={0.6} useFlexGap flexWrap="wrap" justifyContent="flex-end" sx={{ maxWidth: "48%" }}>
+                  <Stack direction="row" spacing={0.6} useFlexGap flexWrap="wrap" justifyContent="flex-end" sx={{ maxWidth: "52%" }}>
                     <Chip
                       label={order.is_delivered ? "Delivered" : "Pending"}
                       size="small"
                       sx={{
-                        height: 24,
+                        height: 22,
                         background: order.is_delivered ? "#dcfce7" : "#ffedd5",
                         color: order.is_delivered ? "#166534" : "#c2410c",
-                        fontSize: 11.5,
+                        fontSize: 10.5,
                         fontWeight: 800,
                       }}
                     />
@@ -582,76 +605,87 @@ export default function Orders({ dark }) {
                       label={formatISTDate(order.order_date)}
                       size="small"
                       sx={{
-                        height: 24,
+                        height: 22,
                         background: "#eff6ff",
                         color: "#1d4ed8",
-                        fontSize: 11.5,
+                        fontSize: 10.5,
                         fontWeight: 700,
                       }}
                     />
                   </Stack>
                 </Stack>
 
-                <Box
-                  sx={{
-                    px: 1.1,
-                    py: 1,
-                    borderRadius: 3,
-                    background: "#f8fbff",
-                    border: "1px solid #dbe7f3",
-                  }}
-                >
-                  <Stack spacing={0.8}>
-                    <Box>
-                      <Typography fontSize={10.5} fontWeight={800} color="#64748b" letterSpacing="0.25px" textTransform="uppercase">
-                        Phone
-                      </Typography>
-                      <Typography fontSize={13} fontWeight={700} color="#334155" mt={0.2}>
-                        {showPhone ? order.phone : `******* ${String(order.phone).slice(-3)}`}
-                      </Typography>
-                    </Box>
-                    {order.address ? (
-                      <Box>
-                        <Typography fontSize={10.5} fontWeight={800} color="#64748b" letterSpacing="0.25px" textTransform="uppercase">
-                          Address
+                {order.address ? (
+                  <Typography
+                    fontSize={12.5}
+                    color="#475569"
+                    textAlign="left"
+                    sx={{
+                      overflow: "hidden",
+                      display: "-webkit-box",
+                      WebkitBoxOrient: "vertical",
+                      WebkitLineClamp: isExpanded ? "unset" : 1,
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {order.address}
+                  </Typography>
+                ) : null}
+
+                <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} flexWrap="wrap">
+                  <Stack direction="row" spacing={0.8} alignItems="center" useFlexGap flexWrap="wrap">
+                    <Typography fontSize={12} fontWeight={700} color="#334155">
+                      {items.length} item{items.length !== 1 ? "s" : ""}
+                    </Typography>
+                    <Typography fontSize={12} color="#cbd5e1">•</Typography>
+                    <Typography fontSize={12.5} fontWeight={800} color="#1d4ed8">
+                      Rs.{orderTotal.toFixed(0)}
+                    </Typography>
+                    {orderDelivery > 0 ? (
+                      <>
+                        <Typography fontSize={12} color="#cbd5e1">•</Typography>
+                        <Typography fontSize={12} fontWeight={700} color="#c2410c">
+                          Delivery Rs.{orderDelivery.toFixed(0)}
                         </Typography>
-                        <Typography
-                          fontSize={13}
-                          color="#475569"
-                          mt={0.2}
-                          sx={{
-                            overflow: "hidden",
-                            display: "-webkit-box",
-                            WebkitBoxOrient: "vertical",
-                            WebkitLineClamp: isExpanded ? "unset" : 2,
-                            wordBreak: "break-word",
-                          }}
-                        >
-                          {order.address}
-                        </Typography>
-                      </Box>
+                      </>
                     ) : null}
                   </Stack>
-                </Box>
+                  <Box display="flex" alignItems="center" gap={0.6}>
+                    <Button
+                      size="small"
+                      onClick={() => toggleExpand(order.order_id)}
+                      endIcon={<ExpandMoreIcon fontSize="small" sx={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }} />}
+                      sx={{ minWidth: "auto", textTransform: "none", fontWeight: 800, color: "#334155", px: 0.5 }}
+                    >
+                      {isExpanded ? "Less" : "Details"}
+                    </Button>
+                    <Switch size="small" checked={!!order.is_delivered} onChange={() => toggleDelivered(order.order_id)} />
+                  </Box>
+                </Stack>
 
                 <Box
                   sx={{
                     px: 1,
-                    py: 0.9,
-                    borderRadius: 3,
-                    background: "#f8fafc",
-                    border: "1px solid #e2e8f0",
+                    py: 0.55,
+                    borderRadius: 2.5,
+                    background: order.is_delivered ? "#f0fdf4" : "#fff8f1",
+                    border: `1px solid ${order.is_delivered ? "#bbf7d0" : "#fdba74"}`,
                   }}
                 >
-                  <Stack direction="row" spacing={0.8} useFlexGap flexWrap="wrap" alignItems="center">
-                    <Chip label={`${items.length} product${items.length !== 1 ? "s" : ""}`} size="small" sx={{ height: 24, background: "#fff", fontWeight: 700 }} />
-                    <Chip label={`Total Rs.${orderTotal.toFixed(0)}`} size="small" sx={{ height: 24, background: "#eef4ff", color: "#1d4ed8", fontWeight: 800 }} />
-                    {orderDelivery > 0 ? <Chip label={`Delivery Rs.${orderDelivery.toFixed(0)}`} size="small" sx={{ height: 24, background: "#fff7ed", color: "#c2410c", fontWeight: 700 }} /> : null}
+                  <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
+                    <Typography fontSize={12} fontWeight={800} color={order.is_delivered ? "#166534" : "#9a3412"}>
+                      {order.is_delivered ? "Delivered" : "Waiting for delivery"}
+                    </Typography>
+                    {order.is_delivered && order.delivered_at ? (
+                      <Typography fontSize={11} fontWeight={700} color="#166534" sx={{ opacity: 0.82 }}>
+                        {formatISTDateTime(order.delivered_at)}
+                      </Typography>
+                    ) : null}
                   </Stack>
                 </Box>
 
                 {items.length > 0 && isExpanded ? (
-                  <Box display="flex" flexDirection="column" gap={0.7}>
+                  <Box display="flex" flexDirection="column" gap={0.55} sx={{ pt: 0.2 }}>
                     {items.map((item) => (
                       <Box
                         key={item.item_id}
@@ -659,59 +693,25 @@ export default function Orders({ dark }) {
                         alignItems="center"
                         gap={0.8}
                         sx={{
-                          px: 1,
-                          py: 0.75,
-                          borderRadius: 3,
+                          px: 0.9,
+                          py: 0.65,
+                          borderRadius: 2.5,
                           background: item.order_type === "adhoc" ? "#fff8db" : "#edf6ff",
                           border: `1px solid ${item.order_type === "adhoc" ? "#fde68a" : "#bfdbfe"}`,
                         }}
                       >
-                        <Typography fontSize={12.5} fontWeight={800} color="text.primary" sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography fontSize={12} fontWeight={800} color="text.primary" sx={{ flex: 1, minWidth: 0 }}>
                           {item.product_name}
                           {item.unit ? <Box component="span" fontWeight={500} color="text.secondary" ml={0.45}>{item.unit}</Box> : null}
                         </Typography>
-                        <Typography fontSize={12} fontWeight={700} color="text.secondary">x{item.quantity}</Typography>
-                        <Typography fontSize={12.5} fontWeight={800} color="#1d4ed8">Rs.{(toNum(item.quantity) * toNum(item.price_at_order)).toFixed(0)}</Typography>
-                        <Chip label={item.order_type === "adhoc" ? "Tomorrow" : "Daily"} size="small" sx={{ height: 22, fontSize: 10.5, fontWeight: 800, background: item.order_type === "adhoc" ? "#f59e0b" : "#3b82f6", color: "white" }} />
+                        <Typography fontSize={11.5} fontWeight={700} color="text.secondary">x{item.quantity}</Typography>
+                        <Typography fontSize={12} fontWeight={800} color="#1d4ed8">Rs.{(toNum(item.quantity) * toNum(item.price_at_order)).toFixed(0)}</Typography>
+                        <Chip label={item.order_type === "adhoc" ? "Tomorrow" : "Daily"} size="small" sx={{ height: 20, fontSize: 10, fontWeight: 800, background: item.order_type === "adhoc" ? "#f59e0b" : "#3b82f6", color: "white" }} />
                       </Box>
                     ))}
                   </Box>
                 ) : null}
-
-                <Stack
-                  direction={{ xs: "column", sm: "row" }}
-                  spacing={1}
-                  alignItems={{ xs: "stretch", sm: "center" }}
-                  justifyContent="space-between"
-                  sx={{
-                    p: 1.1,
-                    borderRadius: 3,
-                    background: order.is_delivered ? "#f0fdf4" : "#fff8f1",
-                    border: `1px solid ${order.is_delivered ? "#bbf7d0" : "#fdba74"}`,
-                  }}
-                >
-                  <Box>
-                    <Typography fontSize={13} fontWeight={800} color={order.is_delivered ? "#166534" : "#9a3412"}>
-                      {order.is_delivered ? "Marked as delivered" : "Waiting for delivery"}
-                    </Typography>
-                    <Typography fontSize={12} color={order.is_delivered ? "#166534" : "#9a3412"} sx={{ opacity: 0.85 }}>
-                      {order.is_delivered && order.delivered_at ? formatISTDateTime(order.delivered_at) : "Tap the switch after delivery is completed"}
-                    </Typography>
-                  </Box>
-                  <Box display="flex" alignItems="center" justifyContent="space-between" gap={1.2}>
-                    <Button
-                      size="small"
-                      onClick={() => toggleExpand(order.order_id)}
-                      endIcon={<ExpandMoreIcon fontSize="small" sx={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }} />}
-                      sx={{ textTransform: "none", fontWeight: 800, color: "#334155", px: 1.2 }}
-                    >
-                      {isExpanded ? "Hide details" : "View details"}
-                    </Button>
-                    <Switch size="medium" checked={!!order.is_delivered} onChange={() => toggleDelivered(order.order_id)} />
-                  </Box>
-                </Stack>
               </Box>
-              {index !== filtered.length - 1 ? <Divider /> : null}
             </Box>
           )
         })}
