@@ -279,7 +279,7 @@ export default function Settings({ dark }) {
   }
 
   /* ── save bar ── */
-  const SaveBar = ({ dirty, saving, saved, onSave, label = "Save Changes" }) => (
+  const renderSaveBar = ({ dirty, saving, saved, onSave, label = "Save Changes" }) => (
     <Box display="flex" alignItems="center" justifyContent="flex-end" gap={1.5} mb={2} flexWrap="wrap">
       <Collapse in={saved}>
         <Alert severity="success" icon={<CheckCircleIcon fontSize="small" />} sx={{ py: 0.3, borderRadius: 2, fontSize: 12 }}>
@@ -310,9 +310,9 @@ export default function Settings({ dark }) {
   )
 
   /* ════ PROFILE TAB ════ */
-  const ProfileTab = () => (
+  const renderProfileTab = () => (
     <Box>
-      <SaveBar dirty={pDirty} saving={pSave} saved={pSaved} onSave={saveProfile} label="Save Profile" />
+      {renderSaveBar({ dirty: pDirty, saving: pSave, saved: pSaved, onSave: saveProfile, label: "Save Profile" })}
       {pLoad ? (
         <Box py={8} textAlign="center"><CircularProgress size={24} sx={{ color: "#2563eb" }} /></Box>
       ) : (
@@ -559,9 +559,9 @@ export default function Settings({ dark }) {
   )
 
   /* ════ SETTINGS TAB ════ */
-  const SettingsTab = () => (
+  const renderSettingsTab = () => (
     <Box>
-      <SaveBar dirty={sDirty} saving={sSave} saved={sSaved} onSave={saveSettings} />
+      {renderSaveBar({ dirty: sDirty, saving: sSave, saved: sSaved, onSave: saveSettings })}
       {sLoad ? (
         <Box py={8} textAlign="center"><CircularProgress size={24} sx={{ color: "#2563eb" }} /></Box>
       ) : (
@@ -720,8 +720,8 @@ export default function Settings({ dark }) {
         </Tabs>
       </Paper>
 
-      {tab === 0 && <ProfileTab />}
-      {tab === 1 && <SettingsTab />}
+      {tab === 0 && renderProfileTab()}
+      {tab === 1 && renderSettingsTab()}
     </Box>
   )
 }

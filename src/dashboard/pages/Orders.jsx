@@ -226,9 +226,12 @@ export default function Orders({ dark }) {
     return Object.values(map).sort((a, b) => a.name.localeCompare(b.name))
   }, [filtered])
 
-  const toggleDelivered = async (id) => {
-    const res = await API.patch(`/orders/${id}/delivered?token=${getToken()}`)
-    setOrders((prev) => prev.map((o) => o.order_id === id ? {
+  const isPaidDeliveredLocked = (order) => !!order?.is_delivered && String(order?.payment_status || "").toLowerCase() === "paid"
+
+  const toggleDelivered = async (order) => {
+    if (isPaidDeliveredLocked(order)) return
+    const res = await API.patch(`/orders/${order.order_id}/delivered?token=${getToken()}`)
+    setOrders((prev) => prev.map((o) => o.order_id === order.order_id ? {
       ...o,
       is_delivered: res.data?.is_delivered ?? !o.is_delivered,
       delivered_at: res.data?.delivered_at || o.delivered_at,
@@ -236,7 +239,7 @@ export default function Orders({ dark }) {
   }
 
   const bulkToggle = async (targetDelivered) => {
-    const toUpdate = filtered.filter((o) => !!o.is_delivered !== targetDelivered)
+    const toUpdate = filtered.filter((o) => !!o.is_delivered !== targetDelivered && !(targetDelivered === false && isPaidDeliveredLocked(o)))
     if (!toUpdate.length) return
     setBulkLoading(true)
     try {
@@ -655,7 +658,12 @@ export default function Orders({ dark }) {
                     >
                       {isExpanded ? "Less" : "Details"}
                     </Button>
-                    <Switch size="small" checked={!!order.is_delivered} onChange={() => toggleDelivered(order.order_id)} />
+                    <Switch
+                      size="small"
+                      checked={!!order.is_delivered}
+                      disabled={isPaidDeliveredLocked(order)}
+                      onChange={() => toggleDelivered(order)}
+                    />
                   </Box>
                 </Stack>
 
@@ -672,7 +680,9 @@ export default function Orders({ dark }) {
                     <Typography fontSize={12} fontWeight={800} color={order.is_delivered ? "#166534" : "#9a3412"}>
                       {order.is_delivered ? "Delivered" : "Waiting for delivery"}
                     </Typography>
-                    {order.is_delivered && order.delivered_at ? (
+                    {isPaidDeliveredLocked(order) ? (
+                      <Chip label="Paid" size="small" sx={{ height: 22, fontWeight: 800, background: "#dcfce7", color: "#166534", border: "1px solid #86efac" }} />
+                    ) : order.is_delivered && order.delivered_at ? (
                       <Typography fontSize={11} fontWeight={700} color="#166534" sx={{ opacity: 0.82 }}>
                         {formatISTDateTime(order.delivered_at)}
                       </Typography>
@@ -715,4 +725,5 @@ export default function Orders({ dark }) {
     </Box>
   )
 }
+
 
