@@ -605,65 +605,6 @@ export default function Settings({ dark }) {
             />
           </Section>
 
-          {/* Price per unit */}
-          <Paper elevation={0} sx={{ borderRadius: 3, border: `1px solid ${border}`, background: bg, mb: 2, overflow: "hidden" }}>
-            <Box sx={{ px: 2.5, py: 1.5, background: bgCard, borderBottom: `1px solid ${border}`, display: "flex", alignItems: "center", gap: 1 }}>
-              <StorefrontIcon fontSize="small" sx={{ color: "#16a34a" }} />
-              <Typography fontWeight={700} fontSize={13} color={textPrimary}>Pricing</Typography>
-            </Box>
-            <Box sx={{ px: 2.5, py: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
-              <Box flex={1}>
-                <Typography fontWeight={600} fontSize={13.5} color={textPrimary}>Price per Packet (₹)</Typography>
-                <Typography fontSize={12} color={textSecondary} mt={0.2}>
-                  Used to calculate invoice totals for each customer.
-                </Typography>
-              </Box>
-              <TextField size="small" type="number"
-                value={s.price_per_unit ?? ""}
-                onChange={(e) => { setS((prev) => ({ ...prev, price_per_unit: e.target.value })); setSDirty(true); setSSaved(false) }}
-                slotProps={{ input: { min: 0, step: 0.5, startAdornment: <InputAdornment position="start"><Typography fontSize={14} fontWeight={700}>₹</Typography></InputAdornment> } }}
-                sx={{ width: 110, "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 15, fontWeight: 700 } }} />
-            </Box>
-            <Divider />
-            <SettingRow
-              icon={<LocalDrinkIcon sx={{ fontSize: 17 }} />}
-              label="Apply Delivery Charge To Subscription Orders"
-              desc="Turn this on if daily subscription-only orders should also get the per-order delivery charge. Turn it off to charge delivery only when a quick order exists."
-              checked={!!s.apply_delivery_charge_on_subscription}
-              onChange={() => toggleS("apply_delivery_charge_on_subscription")}
-              color="#16a34a"
-              dark={dark}
-            />
-            <Divider />
-            <Box sx={{ px: 2.5, py: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
-              <Box flex={1}>
-                <Typography fontWeight={600} fontSize={13.5} color={textPrimary}>Delivery Charge Per Order (₹)</Typography>
-                <Typography fontSize={12} color={textSecondary} mt={0.2}>
-                  Charged only once per order. If subscription items and quick-order items are delivered together, this is still applied just one time.
-                </Typography>
-              </Box>
-              <TextField size="small" type="number"
-                value={s.adhoc_delivery_charge ?? "0"}
-                onChange={(e) => { setS((prev) => ({ ...prev, adhoc_delivery_charge: e.target.value })); setSDirty(true); setSSaved(false) }}
-                slotProps={{ input: { min: 0, step: 1, startAdornment: <InputAdornment position="start"><Typography fontSize={14} fontWeight={700}>₹</Typography></InputAdornment> } }}
-                sx={{ width: 110, "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 15, fontWeight: 700 } }} />
-            </Box>
-            <Divider />
-            <Box sx={{ px: 2.5, py: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
-              <Box flex={1}>
-                <Typography fontWeight={600} fontSize={13.5} color={textPrimary}>Vendor Contact Phone</Typography>
-                <Typography fontSize={12} color={textSecondary} mt={0.2}>
-                  Shown in WhatsApp auto-reply when a customer sends an unrecognised message.
-                </Typography>
-              </Box>
-              <TextField size="small" type="tel"
-                placeholder="+91 XXXXX XXXXX"
-                value={s.vendor_phone ?? ""}
-                onChange={(e) => { setS((prev) => ({ ...prev, vendor_phone: e.target.value })); setSDirty(true); setSSaved(false) }}
-                sx={{ width: 175, "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 13 } }} />
-            </Box>
-          </Paper>
-
           {!!settingsError && <Alert severity="error" sx={{ borderRadius: 2, mb: 2 }}>{settingsError}</Alert>}
 
           {/* Auto-generate Time */}
