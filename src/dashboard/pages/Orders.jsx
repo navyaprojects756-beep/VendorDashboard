@@ -138,7 +138,17 @@ export default function Orders({ dark }) {
     const nextOrders = res.data.orders || []
     setOrders(nextOrders)
     setApartments([
-      ...new Map(nextOrders.map((o) => o.apartment_name || o.apartment).filter(Boolean)),
+      ...new Map(
+        nextOrders
+          .filter((o) => o.address_type === "apartment" && o.apartment_id)
+          .map((o) => [
+            String(o.apartment_id),
+            {
+              apartment_id: String(o.apartment_id),
+              apartment_name: o.apartment_name || o.apartment || "Apartment",
+            },
+          ])
+      ).values(),
     ])
   }
 
@@ -185,7 +195,7 @@ export default function Orders({ dark }) {
     if (apartment === INDIVIDUAL_VALUE) {
       data = data.filter((o) => o.address_type !== "apartment")
     } else if (apartment) {
-      data = data.filter((o) => (o.apartment_name || o.apartment) === apartment)
+      data = data.filter((o) => String(o.apartment_id || "") === String(apartment))
     }
 
     if (block) {
