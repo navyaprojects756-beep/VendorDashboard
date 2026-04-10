@@ -3,10 +3,6 @@ import axios from "axios"
 const API = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
   timeout: 65000, // Render free tier cold start can take up to 60s
-  headers: {
-    "Cache-Control": "no-cache, no-store",
-    "Pragma": "no-cache",
-  },
 })
 
 // Add a unique timestamp to every GET request to bust carrier/browser caches
@@ -38,7 +34,7 @@ API.interceptors.response.use(
 export const getToken = () =>
   new URLSearchParams(window.location.search).get("token")
 
-// Decode JWT payload (no verification — just reads role from URL token)
+// Decode JWT payload (no verification -- just reads role from URL token)
 export const getRole = () => {
   try {
     const token = getToken()
