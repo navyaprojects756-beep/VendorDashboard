@@ -1,5 +1,15 @@
 import { useState, useEffect, useRef } from "react"
 import CompanyLayout from "./CompanyLayout"
+import API from "../services/api"
+
+const INITIAL_VENDOR_FORM = {
+  fullName: "",
+  shopName: "",
+  shopAddress: "",
+  contactNumber: "",
+  apiNumber: "",
+  acceptedTerms: false,
+}
 
 /* ── extra css ── */
 const CSS = `
@@ -27,11 +37,17 @@ const CSS = `
   .screen-row:hover { background: rgba(124,58,237,.05) }
   .demo-btn { transition: all .22s ease }
   .demo-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(124,58,237,.35) }
+  .vendor-input { width: 100%; padding: 14px 15px; border-radius: 14px; border: 1px solid #d8d3f7; background: rgba(255,255,255,.92); color: #0f172a; font-size: .95rem; outline: none; transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease; box-sizing: border-box }
+  .vendor-input:focus { border-color: #7c3aed; box-shadow: 0 0 0 4px rgba(124,58,237,.14); transform: translateY(-1px) }
+  .vendor-input::placeholder { color: #94a3b8 }
+  .vendor-textarea { min-height: 120px; resize: vertical }
+  .vendor-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px }
 
   @media(max-width:768px) {
     .demo-grid { grid-template-columns: 1fr !important }
     .feat-tabs { flex-direction: column !important }
     .hero-phones { flex-direction: column !important; align-items: center !important }
+    .vendor-grid { grid-template-columns: 1fr !important }
   }
 `
 
@@ -321,8 +337,14 @@ export default function ProductDemo() {
   const [activeFeature, setActiveFeature] = useState("orders")
   const [waFlow, setWaFlow]               = useState("subscribe")
   const [visible, setVisible]             = useState({})
+  const [vendorForm, setVendorForm]       = useState(INITIAL_VENDOR_FORM)
+  const [fieldErrors, setFieldErrors]     = useState({})
+  const [showTerms, setShowTerms]         = useState(false)
+  const [vendorSubmitState, setVendorSubmitState] = useState({ status: "idle", message: "" })
 
   const sectionRefs = useRef({})
+  const vendorFormSectionRef = useRef(null)
+  const firstVendorInputRef = useRef(null)
   const registerRef = (id) => (el) => { if (el) sectionRefs.current[id] = el }
 
   useEffect(() => {
@@ -334,6 +356,65 @@ export default function ProductDemo() {
   }, [])
 
   const feat = FEATURES.find(f => f.id === activeFeature)
+
+  function scrollToVendorForm() {
+    vendorFormSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    window.setTimeout(() => firstVendorInputRef.current?.focus(), 450)
+  }
+
+  function updateVendorField(field, value) {
+    setVendorForm((current) => ({ ...current, [field]: value }))
+    setFieldErrors((current) => ({ ...current, [field]: "" }))
+    if (vendorSubmitState.status !== "idle") {
+      setVendorSubmitState({ status: "idle", message: "" })
+    }
+  }
+
+  function validateVendorForm() {
+    const nextErrors = {}
+
+    if (!vendorForm.fullName.trim()) nextErrors.fullName = "Full name is required."
+    if (!vendorForm.shopName.trim()) nextErrors.shopName = "Shop name is required."
+    if (!vendorForm.shopAddress.trim()) nextErrors.shopAddress = "Shop address is required."
+    if (!vendorForm.contactNumber.trim()) nextErrors.contactNumber = "Contact number is required."
+    else if (!/^\d{10,15}$/.test(vendorForm.contactNumber.replace(/[^\d]/g, ""))) nextErrors.contactNumber = "Enter a valid contact number."
+    if (!vendorForm.apiNumber.trim()) nextErrors.apiNumber = "API number is required."
+    else if (!/^\d{10,15}$/.test(vendorForm.apiNumber.replace(/[^\d]/g, ""))) nextErrors.apiNumber = "Enter a valid WhatsApp API number."
+    if (!vendorForm.acceptedTerms) nextErrors.acceptedTerms = "Please accept the terms and conditions."
+
+    setFieldErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0
+  }
+
+  async function handleVendorSubmit(event) {
+    event.preventDefault()
+
+    if (!validateVendorForm()) {
+      setVendorSubmitState({ status: "error", message: "Please correct the highlighted fields." })
+      return
+    }
+
+    setVendorSubmitState({ status: "loading", message: "Submitting vendor details..." })
+
+    try {
+      const response = await API.post("/register-interest", {
+        full_name: vendorForm.fullName,
+        shop_name: vendorForm.shopName,
+        shop_address: vendorForm.shopAddress,
+        contact_number: vendorForm.contactNumber,
+        whatsapp_api_number: vendorForm.apiNumber,
+        accepted_terms: vendorForm.acceptedTerms,
+      })
+
+      setVendorSubmitState({ status: "success", message: response.data?.message || "Thank you. Our vendor team will contact you soon." })
+      setVendorForm(INITIAL_VENDOR_FORM)
+      setFieldErrors({})
+      vendorFormSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    } catch (error) {
+      const message = error.response?.data?.message || "Could not submit vendor details right now."
+      setVendorSubmitState({ status: "error", message })
+    }
+  }
 
   return (
     <CompanyLayout>
@@ -366,6 +447,19 @@ export default function ProductDemo() {
               {["🤖 WhatsApp Bot", "📊 Vendor Dashboard", "🧾 Auto PDF Bills", "⏸ Pause & Resume"].map(t => (
                 <span key={t} style={{ background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.14)", color: "#e2e8f0", padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>{t}</span>
               ))}
+            </div>
+            <div style={{ marginTop: 28, display: "flex", flexWrap: "wrap", gap: 14, alignItems: "center" }}>
+              <button
+                type="button"
+                onClick={scrollToVendorForm}
+                className="demo-btn"
+                style={{ border: "none", borderRadius: 14, padding: "15px 24px", cursor: "pointer", fontWeight: 800, fontSize: ".98rem", color: "#fff", background: "linear-gradient(135deg,#f59e0b,#f97316)", boxShadow: "0 14px 34px rgba(249,115,22,.28)" }}
+              >
+                Register to Become a Vendor
+              </button>
+              <span style={{ color: "#cbd5e1", fontSize: ".9rem", lineHeight: 1.7, maxWidth: 360 }}>
+                Share your basic details and we will use this form as the starting point for vendor onboarding.
+              </span>
             </div>
           </div>
 
@@ -595,6 +689,126 @@ export default function ProductDemo() {
       </div>
 
       {/* ══ CTA ══ */}
+
+      {/* VENDOR ENQUIRY FORM */}
+      <section ref={vendorFormSectionRef} style={{ padding: "96px 6%", background: "radial-gradient(circle at top left,rgba(255,255,255,.98),rgba(243,232,255,.94) 48%,rgba(237,233,254,.88) 100%)" }}>
+        <div style={{ maxWidth: 980, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 28 }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 15px", borderRadius: 999, background: "rgba(124,58,237,.08)", border: "1px solid rgba(124,58,237,.15)", color: "#7c3aed", fontSize: 12, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase" }}>
+              Vendor Onboarding
+            </div>
+            <h2 style={{ margin: "18px 0 10px", fontSize: "clamp(2rem,4vw,3rem)", lineHeight: 1.05, letterSpacing: "-0.05em", color: "#0f172a", fontWeight: 900 }}>
+              Register your shop and let our team take it from there.
+            </h2>
+            <p style={{ margin: "0 auto", maxWidth: 700, color: "#64748b", fontSize: "1rem", lineHeight: 1.8 }}>
+              Share your core business details below. We will review the request, contact you soon, and guide you through the vendor onboarding process.
+            </p>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 14, marginBottom: 24 }} className="demo-grid">
+            {[
+              ["Business details", "Full name, shop name, and address are captured in one clean step."],
+              ["Separate numbers", "Keep contact number and WhatsApp API onboarding number separate."],
+              ["Manual review", "Our team checks the request before activating your vendor account."],
+            ].map(([title, desc]) => (
+              <div key={title} style={{ background: "rgba(255,255,255,.72)", border: "1px solid rgba(196,181,253,.35)", borderRadius: 22, padding: "18px 18px", boxShadow: "0 10px 30px rgba(124,58,237,.06)" }}>
+                <div style={{ color: "#0f172a", fontSize: ".98rem", fontWeight: 800, marginBottom: 6 }}>{title}</div>
+                <div style={{ color: "#64748b", fontSize: ".88rem", lineHeight: 1.65 }}>{desc}</div>
+              </div>
+            ))}
+          </div>
+
+          <form onSubmit={handleVendorSubmit} style={{ background: "rgba(255,255,255,.97)", border: "1px solid rgba(196,181,253,.38)", borderRadius: 32, padding: "34px 32px", boxShadow: "0 28px 80px rgba(109,40,217,.12)", backdropFilter: "blur(18px)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 18, alignItems: "flex-start", flexWrap: "wrap", marginBottom: 24 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: "#7c3aed", marginBottom: 10 }}>Register As Vendor</div>
+                <h3 style={{ margin: "0 0 8px", fontSize: "1.85rem", color: "#0f172a", fontWeight: 900, letterSpacing: "-0.04em" }}>Basic vendor details</h3>
+                <p style={{ margin: 0, color: "#64748b", fontSize: ".95rem", lineHeight: 1.75, maxWidth: 560 }}>Complete the form once. We will save it, keep the vendor inactive by default, and our team will contact you for the next setup steps.</p>
+              </div>
+              <div style={{ minWidth: 220, background: "linear-gradient(135deg,#f8fafc,#f5f3ff)", border: "1px solid #e9d5ff", borderRadius: 22, padding: "14px 16px" }}>
+                <div style={{ color: "#7c3aed", fontSize: ".76rem", fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", marginBottom: 4 }}>What happens next</div>
+                <div style={{ color: "#334155", fontSize: ".9rem", lineHeight: 1.7 }}>Your request goes to our vendor onboarding queue and our team will contact you soon.</div>
+              </div>
+            </div>
+            {vendorSubmitState.status !== "idle" && (
+              <div style={{ marginBottom: 18, padding: "14px 16px", borderRadius: 16, border: vendorSubmitState.status === "success" ? "1px solid #86efac" : vendorSubmitState.status === "loading" ? "1px solid #c4b5fd" : "1px solid #fca5a5", background: vendorSubmitState.status === "success" ? "#f0fdf4" : vendorSubmitState.status === "loading" ? "#f5f3ff" : "#fef2f2", color: vendorSubmitState.status === "success" ? "#166534" : vendorSubmitState.status === "loading" ? "#5b21b6" : "#b91c1c", fontSize: ".9rem", lineHeight: 1.7, fontWeight: 600 }}>
+                {vendorSubmitState.message}
+              </div>
+            )}
+            <div className="vendor-grid">
+              <label style={{ display: "block" }}>
+                <div style={{ fontSize: ".88rem", fontWeight: 700, color: "#1e293b", marginBottom: 8 }}>Full Name</div>
+                <input ref={firstVendorInputRef} className="vendor-input" type="text" placeholder="Enter your full name" value={vendorForm.fullName} onChange={(event) => updateVendorField("fullName", event.target.value)} />
+                {fieldErrors.fullName && <div style={{ color: "#dc2626", fontSize: ".8rem", marginTop: 6 }}>{fieldErrors.fullName}</div>}
+              </label>
+              <label style={{ display: "block" }}>
+                <div style={{ fontSize: ".88rem", fontWeight: 700, color: "#1e293b", marginBottom: 8 }}>Shop Name</div>
+                <input className="vendor-input" type="text" placeholder="Enter your shop name" value={vendorForm.shopName} onChange={(event) => updateVendorField("shopName", event.target.value)} />
+                {fieldErrors.shopName && <div style={{ color: "#dc2626", fontSize: ".8rem", marginTop: 6 }}>{fieldErrors.shopName}</div>}
+              </label>
+            </div>
+            <label style={{ display: "block", marginTop: 18 }}>
+              <div style={{ fontSize: ".88rem", fontWeight: 700, color: "#1e293b", marginBottom: 8 }}>Shop Address</div>
+              <textarea className="vendor-input vendor-textarea" placeholder="Enter complete shop address" value={vendorForm.shopAddress} onChange={(event) => updateVendorField("shopAddress", event.target.value)} />
+              {fieldErrors.shopAddress && <div style={{ color: "#dc2626", fontSize: ".8rem", marginTop: 6 }}>{fieldErrors.shopAddress}</div>}
+            </label>
+            <div className="vendor-grid" style={{ marginTop: 18 }}>
+              <label style={{ display: "block" }}>
+                <div style={{ fontSize: ".88rem", fontWeight: 700, color: "#1e293b", marginBottom: 8 }}>Contact Number</div>
+                <input className="vendor-input" type="tel" inputMode="tel" placeholder="Enter your contact number" value={vendorForm.contactNumber} onChange={(event) => updateVendorField("contactNumber", event.target.value)} />
+                {fieldErrors.contactNumber && <div style={{ color: "#dc2626", fontSize: ".8rem", marginTop: 6 }}>{fieldErrors.contactNumber}</div>}
+              </label>
+              <label style={{ display: "block" }}>
+                <div style={{ fontSize: ".88rem", fontWeight: 700, color: "#1e293b", marginBottom: 8 }}>API Number</div>
+                <input className="vendor-input" type="tel" inputMode="tel" placeholder="Enter WhatsApp API number" value={vendorForm.apiNumber} onChange={(event) => updateVendorField("apiNumber", event.target.value)} />
+                {fieldErrors.apiNumber && <div style={{ color: "#dc2626", fontSize: ".8rem", marginTop: 6 }}>{fieldErrors.apiNumber}</div>}
+              </label>
+            </div>
+            <div style={{ marginTop: 16, background: "linear-gradient(135deg,#fff7ed,#fff1f2)", border: "1px solid #fdba74", borderRadius: 20, padding: "15px 16px", display: "flex", gap: 12, alignItems: "flex-start" }}>
+              <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#fed7aa", color: "#c2410c", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, flexShrink: 0 }}>!</div>
+              <div>
+                <div style={{ fontSize: ".92rem", fontWeight: 800, color: "#9a3412", marginBottom: 4 }}>Important note for API number</div>
+                <div style={{ color: "#9a3412", fontSize: ".89rem", lineHeight: 1.7 }}>For this number, normal WhatsApp will not work after moving to the WhatsApp Business API setup. Please use a dedicated number for API onboarding.</div>
+              </div>
+            </div>
+            <label style={{ marginTop: 18, display: "flex", gap: 12, alignItems: "flex-start", background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 20, padding: "15px 16px", cursor: "pointer" }}>
+              <input type="checkbox" checked={vendorForm.acceptedTerms} onChange={(event) => updateVendorField("acceptedTerms", event.target.checked)} style={{ marginTop: 4, accentColor: "#7c3aed", width: 16, height: 16 }} />
+              <span style={{ color: "#4c1d95", fontSize: ".92rem", lineHeight: 1.8 }}><strong>I approve the <button type="button" onClick={() => setShowTerms(true)} style={{ border: "none", background: "transparent", color: "#6d28d9", fontWeight: 800, padding: 0, cursor: "pointer", textDecoration: "underline" }}>terms and conditions</button></strong> for moving ahead with vendor registration and setup discussion.</span>
+            </label>
+            {fieldErrors.acceptedTerms && <div style={{ color: "#dc2626", fontSize: ".8rem", marginTop: 8 }}>{fieldErrors.acceptedTerms}</div>}
+            <div style={{ marginTop: 24, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
+              <button type="submit" disabled={vendorSubmitState.status === "loading"} className="demo-btn" style={{ border: "none", borderRadius: 16, padding: "15px 26px", cursor: vendorSubmitState.status === "loading" ? "wait" : "pointer", fontWeight: 800, fontSize: ".98rem", color: "white", background: vendorSubmitState.status === "loading" ? "#a78bfa" : "linear-gradient(135deg,#7c3aed,#4f46e5)", boxShadow: "0 16px 34px rgba(124,58,237,.24)", opacity: vendorSubmitState.status === "loading" ? 0.9 : 1 }}>
+                {vendorSubmitState.status === "loading" ? "Submitting..." : "Submit Vendor Details"}
+              </button>
+              <span style={{ color: "#64748b", fontSize: ".88rem", fontWeight: 500 }}>Your details go directly to our vendor onboarding queue.</span>
+            </div>
+          </form>
+        </div>
+      </section>
+      {showTerms && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 50 }} onClick={() => setShowTerms(false)}>
+          <div style={{ width: "min(680px,100%)", maxHeight: "85vh", overflowY: "auto", background: "white", borderRadius: 24, padding: "28px 24px", boxShadow: "0 28px 80px rgba(15,23,42,.28)" }} onClick={(event) => event.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", marginBottom: 18 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: "#7c3aed", marginBottom: 6 }}>Terms and Conditions</div>
+                <h3 style={{ margin: 0, fontSize: "1.45rem", color: "#0f172a", fontWeight: 900 }}>Vendor registration terms</h3>
+              </div>
+              <button type="button" onClick={() => setShowTerms(false)} style={{ border: "none", background: "#f3f4f6", color: "#111827", width: 36, height: 36, borderRadius: 999, cursor: "pointer", fontWeight: 800 }}>X</button>
+            </div>
+            <div style={{ color: "#475569", lineHeight: 1.85, fontSize: ".94rem", display: "grid", gap: 14 }}>
+              <p style={{ margin: 0 }}>By submitting this form, you confirm that the details provided for vendor onboarding are correct to the best of your knowledge.</p>
+              <p style={{ margin: 0 }}>You agree that our team may contact you on the provided contact number or WhatsApp API number to continue onboarding and business setup discussions.</p>
+              <p style={{ margin: 0 }}>You understand that the WhatsApp API number should be a dedicated number. Normal personal WhatsApp use may not continue on that number after Business API onboarding.</p>
+              <p style={{ margin: 0 }}>Submitting this form does not guarantee activation. Vendor records may remain inactive until review, verification, and onboarding setup are completed.</p>
+              <p style={{ margin: 0 }}>You consent to the storage of the submitted business and contact details for onboarding, support, and operational communication.</p>
+            </div>
+            <div style={{ marginTop: 22, display: "flex", justifyContent: "flex-end" }}>
+              <button type="button" onClick={() => setShowTerms(false)} className="demo-btn" style={{ border: "none", borderRadius: 14, padding: "12px 20px", cursor: "pointer", fontWeight: 800, color: "white", background: "linear-gradient(135deg,#7c3aed,#4f46e5)" }}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <section style={{ padding: "80px 6%", background: "#fff", textAlign: "center" }}>
         <div style={{ maxWidth: 600, margin: "0 auto" }}>
           <div style={{ fontSize: 44, marginBottom: 16 }}>🥛</div>
